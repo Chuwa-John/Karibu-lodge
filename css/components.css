@@ -1,0 +1,74 @@
+ /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.85rem 2rem; border-radius: 50px;
+      font-family: 'Jost', sans-serif; font-size: 0.85rem; font-weight: 500;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      cursor: pointer; border: none; transition: var(--transition); white-space: nowrap;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+      color: var(--white); box-shadow: 0 4px 20px rgba(201,168,76,0.35);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, var(--gold-light), var(--gold));
+      transform: translateY(-2px); box-shadow: 0 8px 28px rgba(201,168,76,0.45);
+    }
+    .btn-outline { background: transparent; color: var(--gold); border: 1.5px solid var(--gold); }
+    .btn-outline:hover { background: var(--gold); color: var(--white); transform: translateY(-2px); }
+    .btn-white { background: var(--white); color: var(--bark); }
+    .btn-white:hover { background: var(--cream); transform: translateY(-2px); }
+    .btn-whatsapp {
+      background: linear-gradient(135deg, #25D366, #128C7E);
+      color: var(--white); box-shadow: 0 4px 20px rgba(37,211,102,0.3);
+    }
+    .btn-whatsapp:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(37,211,102,0.4); }
+    /* Room Cards */
+    .rooms-preview { padding: 6rem 0; background: var(--cream); }
+    .section-header { text-align: center; margin-bottom: 3.5rem; }
+    .divider { width: 60px; height: 2px; background: linear-gradient(to right, transparent, var(--gold), transparent); margin: 1.2rem auto 0; }
+    .rooms-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; }
+    .room-card { background: var(--white); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); transition: var(--transition); position: relative; }
+    .room-card:hover { transform: translateY(-8px); box-shadow: var(--shadow-lg); }
+    .room-img-wrap { position: relative; height: 240px; overflow: hidden; }
+    .room-img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
+    .room-card:hover .room-img-wrap img { transform: scale(1.06); }
+    .badge { position: absolute; top: 1rem; left: 1rem; background: linear-gradient(135deg, #E63946, #C1121F); color: var(--white); font-size: 0.65rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.3rem 0.8rem; border-radius: 50px; box-shadow: 0 2px 10px rgba(230,57,70,0.35); }
+    .badge-popular { background: linear-gradient(135deg, var(--gold), var(--gold-dark)); box-shadow: 0 2px 10px rgba(201,168,76,0.35); }
+    .room-body { padding: 1.8rem; }
+    .room-type-label { font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); font-weight: 500; margin-bottom: 0.4rem; }
+    .room-body h3 { font-size: 1.6rem; color: var(--bark); margin-bottom: 0.8rem; }
+    .room-price { display: flex; align-items: baseline; gap: 0.3rem; margin-bottom: 1.2rem; }
+    .price-amount { font-family: 'Cormorant Garamond', serif; font-size: 1.9rem; font-weight: 600; color: var(--gold-dark); }
+    .price-unit { font-size: 0.78rem; color: var(--earth-light); font-weight: 400; }
+    .amenities { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.5rem; }
+    .amenity-tag { display: inline-flex; align-items: center; gap: 0.35rem; background: var(--cream); border: 1px solid var(--cream-dark); border-radius: 50px; padding: 0.3rem 0.75rem; font-size: 0.75rem; color: var(--earth); }
+    /* Testimonials */
+    .testimonials { padding: 6rem 0; background: var(--bark); position: relative; overflow: hidden; }
+    .testimonials::before { content: '"'; position: absolute; top: -1rem; left: 5%; font-family: 'Cormorant Garamond', serif; font-size: 20rem; color: rgba(201,168,76,0.05); line-height: 1; pointer-events: none; }
+    .testimonials .section-title { color: var(--cream); }
+    .testimonials-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.8rem; margin-top: 3rem; }
+    .testi-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(201,168,76,0.15); border-radius: var(--radius-lg); padding: 2rem; transition: var(--transition); backdrop-filter: blur(10px); }
+    .testi-card:hover { background: rgba(255,255,255,0.08); border-color: rgba(201,168,76,0.35); transform: translateY(-4px); }
+    .stars { color: var(--gold); font-size: 0.85rem; margin-bottom: 1rem; letter-spacing: 2px; }
+    .testi-text { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-style: italic; color: rgba(255,255,255,0.8); line-height: 1.7; margin-bottom: 1.5rem; }
+    .testi-author { display: flex; align-items: center; gap: 0.8rem; }
+    .testi-avatar { width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, var(--gold), var(--earth)); display: grid; place-items: center; font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-weight: 600; color: var(--white); flex-shrink: 0; }
+    .testi-name { font-weight: 500; color: var(--white); font-size: 0.9rem; }
+    .testi-origin { font-size: 0.75rem; color: var(--mist); }
+     /* Gallery */
+    .gallery { padding: 6rem 0; background: var(--cream-dark); }
+    .gallery-grid { display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(2, 220px); gap: 0.75rem; margin-top: 3rem; }
+    .gallery-item { overflow: hidden; border-radius: var(--radius); position: relative; cursor: pointer; }
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
+    .gallery-item:hover img { transform: scale(1.08); }
+    .gallery-item:nth-child(1) { grid-column: 1 / 5; grid-row: 1 / 3; }
+    .gallery-item:nth-child(2) { grid-column: 5 / 9; grid-row: 1; }
+    .gallery-item:nth-child(3) { grid-column: 9 / 13; grid-row: 1; }
+    .gallery-item:nth-child(4) { grid-column: 5 / 8; grid-row: 2; }
+    .gallery-item:nth-child(5) { grid-column: 8 / 10; grid-row: 2; }
+    .gallery-item:nth-child(6) { grid-column: 10 / 13; grid-row: 2; }
+    .gallery-overlay { position: absolute; inset: 0; background: rgba(44,31,20,0); transition: background 0.3s ease; display: grid; place-items: center; }
+    .gallery-item:hover .gallery-overlay { background: rgba(44,31,20,0.3); }
+    .gallery-icon { color: white; font-size: 1.8rem; opacity: 0; transform: scale(0.7); transition: var(--transition); }
+    .gallery-item:hover .gallery-icon { opacity: 1; transform: scale(1); }

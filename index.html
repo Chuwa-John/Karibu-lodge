@@ -10,334 +10,26 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
-
-  <style>
-    /* =========================================
-       KARIBU LODGE — All Styles
-       ========================================= */
-
-    :root {
-      --gold:        #C9A84C;
-      --gold-light:  #E8C97A;
-      --gold-dark:   #A07830;
-      --earth:       #6B4F3A;
-      --earth-light: #9B7355;
-      --cream:       #FAF6F0;
-      --cream-dark:  #F0E8DC;
-      --bark:        #2C1F14;
-      --bark-light:  #3D2B1A;
-      --mist:        #C8B89A;
-      --white:       #FFFFFF;
-      --shadow-sm:   0 2px 12px rgba(44,31,20,0.08);
-      --shadow-md:   0 8px 32px rgba(44,31,20,0.14);
-      --shadow-lg:   0 20px 60px rgba(44,31,20,0.20);
-      --radius:      12px;
-      --radius-lg:   20px;
-      --transition:  0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    }
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; font-size: 16px; }
-    body {
-      font-family: 'Jost', sans-serif;
-      background: var(--cream);
-      color: var(--bark);
-      line-height: 1.6;
-      overflow-x: hidden;
-      opacity: 0;
-      transition: opacity 0.4s ease;
-    }
-    body.ready { opacity: 1; }
-    img { max-width: 100%; height: auto; display: block; }
-    a { text-decoration: none; color: inherit; }
-
-    h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif; line-height: 1.15; font-weight: 600; }
-
-    .section-label {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.7rem; font-weight: 500;
-      letter-spacing: 0.25em; text-transform: uppercase;
-      color: var(--gold); margin-bottom: 0.75rem;
-    }
-    .section-title { font-size: clamp(2rem, 4vw, 3rem); color: var(--bark); }
-    .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
-
-    /* Buttons */
-    .btn {
-      display: inline-flex; align-items: center; gap: 0.5rem;
-      padding: 0.85rem 2rem; border-radius: 50px;
-      font-family: 'Jost', sans-serif; font-size: 0.85rem; font-weight: 500;
-      letter-spacing: 0.08em; text-transform: uppercase;
-      cursor: pointer; border: none; transition: var(--transition); white-space: nowrap;
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, var(--gold), var(--gold-dark));
-      color: var(--white); box-shadow: 0 4px 20px rgba(201,168,76,0.35);
-    }
-    .btn-primary:hover {
-      background: linear-gradient(135deg, var(--gold-light), var(--gold));
-      transform: translateY(-2px); box-shadow: 0 8px 28px rgba(201,168,76,0.45);
-    }
-    .btn-outline { background: transparent; color: var(--gold); border: 1.5px solid var(--gold); }
-    .btn-outline:hover { background: var(--gold); color: var(--white); transform: translateY(-2px); }
-    .btn-white { background: var(--white); color: var(--bark); }
-    .btn-white:hover { background: var(--cream); transform: translateY(-2px); }
-    .btn-whatsapp {
-      background: linear-gradient(135deg, #25D366, #128C7E);
-      color: var(--white); box-shadow: 0 4px 20px rgba(37,211,102,0.3);
-    }
-    .btn-whatsapp:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(37,211,102,0.4); }
-
-    /* Navbar */
-    .navbar {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-      padding: 1.25rem 0; transition: var(--transition);
-    }
-    .navbar.scrolled {
-      background: rgba(250,246,240,0.96); backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px); box-shadow: var(--shadow-sm); padding: 0.85rem 0;
-    }
-    .navbar .container { display: flex; align-items: center; justify-content: space-between; }
-    .logo { display: flex; align-items: center; gap: 0.6rem; }
-    .logo-icon {
-      width: 38px; height: 38px;
-      background: linear-gradient(135deg, var(--gold), var(--gold-dark));
-      border-radius: 10px; display: grid; place-items: center; font-size: 1.1rem;
-    }
-    .logo-text { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 600; color: var(--bark); line-height: 1; }
-    .logo-text span { display: block; font-size: 0.6rem; font-family: 'Jost', sans-serif; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); font-weight: 500; margin-top: 1px; }
-    .nav-links { display: flex; align-items: center; gap: 2.5rem; list-style: none; }
-    .nav-links a { font-size: 0.82rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bark); position: relative; transition: color 0.25s; }
-    .nav-links a::after { content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 1.5px; background: var(--gold); transition: width 0.3s ease; }
-    .nav-links a:hover, .nav-links a.active { color: var(--gold); }
-    .nav-links a:hover::after, .nav-links a.active::after { width: 100%; }
-    .nav-cta { margin-left: 1rem; }
-    .hamburger { display: none; flex-direction: column; gap: 5px; cursor: pointer; padding: 4px; background: none; border: none; }
-    .hamburger span { display: block; width: 24px; height: 2px; background: var(--bark); border-radius: 2px; transition: var(--transition); }
-    .hamburger.active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-    .hamburger.active span:nth-child(2) { opacity: 0; }
-    .hamburger.active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-
-    /* Mobile Nav */
-    .mobile-nav {
-      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: var(--cream); z-index: 999;
-      flex-direction: column; align-items: center; justify-content: center; gap: 2.5rem;
-      transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.77, 0, 0.175, 1);
-    }
-    .mobile-nav.open { transform: translateX(0); }
-    .mobile-nav a { font-family: 'Cormorant Garamond', serif; font-size: 2.2rem; font-weight: 600; color: var(--bark); transition: color 0.25s; }
-    .mobile-nav a:hover { color: var(--gold); }
-
-    /* Hero */
-    .hero { position: relative; height: 100svh; min-height: 600px; display: flex; align-items: center; overflow: hidden; }
-    .hero-bg { position: absolute; inset: 0; background-size: cover; background-position: center; transform: scale(1.05); transition: transform 8s ease; }
-    .hero-bg.loaded { transform: scale(1); }
-    .hero-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(44,31,20,0.72) 0%, rgba(44,31,20,0.35) 60%, rgba(44,31,20,0.15) 100%); }
-    .hero-content { position: relative; z-index: 2; color: var(--white); max-width: 640px; }
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 0.5rem;
-      background: rgba(201,168,76,0.2); border: 1px solid rgba(201,168,76,0.5);
-      border-radius: 50px; padding: 0.4rem 1rem; font-size: 0.72rem;
-      letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-light);
-      margin-bottom: 1.5rem; backdrop-filter: blur(8px);
-      animation: fadeInDown 0.8s ease forwards;
-    }
-    .hero h1 { font-size: clamp(2.8rem, 7vw, 5rem); color: var(--white); margin-bottom: 1.2rem; animation: fadeInUp 0.9s 0.15s ease both; }
-    .hero h1 em { color: var(--gold-light); font-style: italic; }
-    .hero p { font-size: 1.05rem; color: rgba(255,255,255,0.82); max-width: 460px; margin-bottom: 2.2rem; font-weight: 300; animation: fadeInUp 0.9s 0.3s ease both; }
-    .hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; animation: fadeInUp 0.9s 0.45s ease both; }
-    .hero-scroll { position: absolute; bottom: 2.5rem; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: rgba(255,255,255,0.6); font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; z-index: 2; animation: fadeIn 1.5s 1s ease both; }
-    .scroll-line { width: 1px; height: 40px; background: linear-gradient(to bottom, rgba(255,255,255,0.6), transparent); animation: scrollPulse 2s infinite; }
-
-    /* Room Cards */
-    .rooms-preview { padding: 6rem 0; background: var(--cream); }
-    .section-header { text-align: center; margin-bottom: 3.5rem; }
-    .divider { width: 60px; height: 2px; background: linear-gradient(to right, transparent, var(--gold), transparent); margin: 1.2rem auto 0; }
-    .rooms-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; }
-    .room-card { background: var(--white); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); transition: var(--transition); position: relative; }
-    .room-card:hover { transform: translateY(-8px); box-shadow: var(--shadow-lg); }
-    .room-img-wrap { position: relative; height: 240px; overflow: hidden; }
-    .room-img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
-    .room-card:hover .room-img-wrap img { transform: scale(1.06); }
-    .badge { position: absolute; top: 1rem; left: 1rem; background: linear-gradient(135deg, #E63946, #C1121F); color: var(--white); font-size: 0.65rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.3rem 0.8rem; border-radius: 50px; box-shadow: 0 2px 10px rgba(230,57,70,0.35); }
-    .badge-popular { background: linear-gradient(135deg, var(--gold), var(--gold-dark)); box-shadow: 0 2px 10px rgba(201,168,76,0.35); }
-    .room-body { padding: 1.8rem; }
-    .room-type-label { font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); font-weight: 500; margin-bottom: 0.4rem; }
-    .room-body h3 { font-size: 1.6rem; color: var(--bark); margin-bottom: 0.8rem; }
-    .room-price { display: flex; align-items: baseline; gap: 0.3rem; margin-bottom: 1.2rem; }
-    .price-amount { font-family: 'Cormorant Garamond', serif; font-size: 1.9rem; font-weight: 600; color: var(--gold-dark); }
-    .price-unit { font-size: 0.78rem; color: var(--earth-light); font-weight: 400; }
-    .amenities { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.5rem; }
-    .amenity-tag { display: inline-flex; align-items: center; gap: 0.35rem; background: var(--cream); border: 1px solid var(--cream-dark); border-radius: 50px; padding: 0.3rem 0.75rem; font-size: 0.75rem; color: var(--earth); }
-
-    /* Testimonials */
-    .testimonials { padding: 6rem 0; background: var(--bark); position: relative; overflow: hidden; }
-    .testimonials::before { content: '"'; position: absolute; top: -1rem; left: 5%; font-family: 'Cormorant Garamond', serif; font-size: 20rem; color: rgba(201,168,76,0.05); line-height: 1; pointer-events: none; }
-    .testimonials .section-title { color: var(--cream); }
-    .testimonials-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.8rem; margin-top: 3rem; }
-    .testi-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(201,168,76,0.15); border-radius: var(--radius-lg); padding: 2rem; transition: var(--transition); backdrop-filter: blur(10px); }
-    .testi-card:hover { background: rgba(255,255,255,0.08); border-color: rgba(201,168,76,0.35); transform: translateY(-4px); }
-    .stars { color: var(--gold); font-size: 0.85rem; margin-bottom: 1rem; letter-spacing: 2px; }
-    .testi-text { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-style: italic; color: rgba(255,255,255,0.8); line-height: 1.7; margin-bottom: 1.5rem; }
-    .testi-author { display: flex; align-items: center; gap: 0.8rem; }
-    .testi-avatar { width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, var(--gold), var(--earth)); display: grid; place-items: center; font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-weight: 600; color: var(--white); flex-shrink: 0; }
-    .testi-name { font-weight: 500; color: var(--white); font-size: 0.9rem; }
-    .testi-origin { font-size: 0.75rem; color: var(--mist); }
-
-    /* Gallery */
-    .gallery { padding: 6rem 0; background: var(--cream-dark); }
-    .gallery-grid { display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(2, 220px); gap: 0.75rem; margin-top: 3rem; }
-    .gallery-item { overflow: hidden; border-radius: var(--radius); position: relative; cursor: pointer; }
-    .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
-    .gallery-item:hover img { transform: scale(1.08); }
-    .gallery-item:nth-child(1) { grid-column: 1 / 5; grid-row: 1 / 3; }
-    .gallery-item:nth-child(2) { grid-column: 5 / 9; grid-row: 1; }
-    .gallery-item:nth-child(3) { grid-column: 9 / 13; grid-row: 1; }
-    .gallery-item:nth-child(4) { grid-column: 5 / 8; grid-row: 2; }
-    .gallery-item:nth-child(5) { grid-column: 8 / 10; grid-row: 2; }
-    .gallery-item:nth-child(6) { grid-column: 10 / 13; grid-row: 2; }
-    .gallery-overlay { position: absolute; inset: 0; background: rgba(44,31,20,0); transition: background 0.3s ease; display: grid; place-items: center; }
-    .gallery-item:hover .gallery-overlay { background: rgba(44,31,20,0.3); }
-    .gallery-icon { color: white; font-size: 1.8rem; opacity: 0; transform: scale(0.7); transition: var(--transition); }
-    .gallery-item:hover .gallery-icon { opacity: 1; transform: scale(1); }
-
-    /* Page Hero (interior pages) */
-    .page-hero { padding: 10rem 0 5rem; background: linear-gradient(135deg, var(--bark) 0%, var(--bark-light) 100%); text-align: center; position: relative; overflow: hidden; }
-    .page-hero::before { content: ''; position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0.2; }
-    .page-hero .container { position: relative; z-index: 1; }
-    .page-hero h1 { color: var(--white); font-size: clamp(2.5rem, 5vw, 4rem); }
-    .page-hero p { color: rgba(255,255,255,0.7); margin-top: 1rem; }
-
-    /* Rooms Detail */
-    .rooms-detail { padding: 6rem 0; }
-    .room-detail-card { background: var(--white); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-md); margin-bottom: 3rem; display: grid; grid-template-columns: 1fr 1fr; transition: var(--transition); }
-    .room-detail-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-4px); }
-    .room-detail-card.reverse { direction: rtl; }
-    .room-detail-card.reverse > * { direction: ltr; }
-    .room-detail-img { position: relative; min-height: 380px; overflow: hidden; }
-    .room-detail-img img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
-    .room-detail-card:hover .room-detail-img img { transform: scale(1.04); }
-    .room-detail-body { padding: 3rem; display: flex; flex-direction: column; justify-content: center; }
-    .room-detail-body h2 { font-size: 2.2rem; margin-bottom: 1rem; }
-    .room-detail-body > p { color: var(--earth-light); margin-bottom: 2rem; line-height: 1.8; }
-    .amenities-list { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-bottom: 2rem; }
-    .amenity-item { display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem; color: var(--bark); }
-    .amenity-icon-wrap { width: 36px; height: 36px; background: var(--cream); border-radius: 10px; display: grid; place-items: center; font-size: 1rem; flex-shrink: 0; }
-    .price-display { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; padding: 1.2rem 1.5rem; background: var(--cream); border-radius: var(--radius); border-left: 3px solid var(--gold); }
-    .price-big { font-family: 'Cormorant Garamond', serif; font-size: 2.5rem; font-weight: 600; color: var(--gold-dark); }
-
-    /* Booking */
-    .booking-section { padding: 6rem 0; background: var(--cream); }
-    .booking-layout { display: grid; grid-template-columns: 1fr 420px; gap: 3rem; align-items: start; }
-    .booking-info h2 { font-size: 2.5rem; margin-bottom: 1rem; }
-    .booking-info > p { color: var(--earth-light); margin-bottom: 2.5rem; line-height: 1.8; }
-    .info-cards { display: grid; gap: 1rem; }
-    .info-card { display: flex; gap: 1rem; align-items: flex-start; padding: 1.2rem; background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
-    .info-card-icon { width: 44px; height: 44px; background: linear-gradient(135deg, var(--gold), var(--gold-dark)); border-radius: 12px; display: grid; place-items: center; font-size: 1.1rem; flex-shrink: 0; }
-    .info-card h4 { font-size: 0.95rem; margin-bottom: 0.25rem; }
-    .info-card p { font-size: 0.82rem; color: var(--earth-light); }
-    .booking-form-wrap { background: var(--white); border-radius: var(--radius-lg); padding: 2.5rem; box-shadow: var(--shadow-md); position: sticky; top: 100px; }
-    .booking-form-wrap h3 { font-size: 1.7rem; margin-bottom: 0.5rem; }
-    .form-subtitle { font-size: 0.82rem; color: var(--earth-light); margin-bottom: 2rem; }
-    .form-group { margin-bottom: 1.2rem; }
-    .form-group label { display: block; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--earth); margin-bottom: 0.5rem; }
-    .form-group input, .form-group select { width: 100%; padding: 0.85rem 1rem; border: 1.5px solid var(--cream-dark); border-radius: var(--radius); font-family: 'Jost', sans-serif; font-size: 0.92rem; color: var(--bark); background: var(--cream); transition: border-color 0.25s, box-shadow 0.25s; outline: none; appearance: none; -webkit-appearance: none; }
-    .form-group input:focus, .form-group select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,168,76,0.12); background: var(--white); }
-    .form-group input.error, .form-group select.error { border-color: #E63946; }
-    .error-msg { font-size: 0.75rem; color: #E63946; margin-top: 0.3rem; display: none; }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    .btn-submit { width: 100%; justify-content: center; padding: 1rem; font-size: 0.9rem; margin-top: 0.5rem; }
-    .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; display: none; }
-    .loading .spinner { display: block; }
-    .loading .btn-text { display: none; }
-    .success-message { display: none; text-align: center; padding: 2rem; }
-    .success-message.show { display: block; }
-    .success-icon { width: 70px; height: 70px; background: linear-gradient(135deg, #52b788, #40916c); border-radius: 50%; display: grid; place-items: center; font-size: 1.8rem; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(64,145,108,0.35); }
-    .success-message h3 { font-size: 1.6rem; margin-bottom: 0.75rem; }
-    .success-message p { color: var(--earth-light); font-size: 0.9rem; }
-
-    /* Contact */
-    .contact-section { padding: 6rem 0; }
-    .contact-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: start; }
-    .contact-info h2 { font-size: 2.5rem; margin-bottom: 1rem; }
-    .contact-info > p { color: var(--earth-light); margin-bottom: 2.5rem; line-height: 1.8; }
-    .contact-items { display: grid; gap: 1.2rem; margin-bottom: 2.5rem; }
-    .contact-item { display: flex; align-items: center; gap: 1rem; padding: 1.2rem 1.5rem; background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-sm); transition: var(--transition); cursor: pointer; }
-    .contact-item:hover { transform: translateX(6px); box-shadow: var(--shadow-md); }
-    .contact-item-icon { width: 46px; height: 46px; background: linear-gradient(135deg, var(--gold), var(--gold-dark)); border-radius: 12px; display: grid; place-items: center; font-size: 1.1rem; flex-shrink: 0; color: white; }
-    .contact-item-text label { display: block; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); font-weight: 500; margin-bottom: 2px; }
-    .contact-item-text span { font-size: 0.95rem; font-weight: 500; color: var(--bark); }
-    .map-container { border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-md); height: 420px; background: var(--cream-dark); position: relative; }
-    .map-container iframe { width: 100%; height: 100%; border: none; display: block; }
-    .map-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.8rem; color: var(--earth-light); font-size: 0.85rem; background: var(--cream-dark); }
-    .map-placeholder .map-icon { font-size: 2.5rem; }
-
-    /* Footer */
-    .footer { background: var(--bark); padding: 4rem 0 2rem; }
-    .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 3rem; padding-bottom: 3rem; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 2rem; }
-    .footer-brand .logo-text { color: var(--white); }
-    .footer-desc { color: rgba(255,255,255,0.55); font-size: 0.87rem; margin-top: 1rem; line-height: 1.75; max-width: 280px; }
-    .footer-col h4 { font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); font-family: 'Jost', sans-serif; margin-bottom: 1.2rem; }
-    .footer-col ul { list-style: none; display: grid; gap: 0.7rem; }
-    .footer-col ul li a { color: rgba(255,255,255,0.55); font-size: 0.87rem; transition: color 0.25s; }
-    .footer-col ul li a:hover { color: var(--gold-light); }
-    .footer-bottom { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
-    .footer-bottom p { color: rgba(255,255,255,0.3); font-size: 0.8rem; }
-
-    /* Floating WhatsApp */
-    .whatsapp-float { position: fixed; bottom: 2rem; right: 2rem; z-index: 900; width: 56px; height: 56px; background: linear-gradient(135deg, #25D366, #128C7E); border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; box-shadow: 0 4px 20px rgba(37,211,102,0.45); transition: var(--transition); animation: pulse-green 2.5s infinite; color: white; }
-    .whatsapp-float:hover { transform: scale(1.12); box-shadow: 0 8px 30px rgba(37,211,102,0.55); animation: none; }
-
-    /* Animations */
-    @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes fadeInUp   { from { opacity: 0; transform: translateY(30px);  } to { opacity: 1; transform: translateY(0); } }
-    @keyframes fadeIn     { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes scrollPulse { 0%, 100% { opacity: 0.6; transform: scaleY(1); } 50% { opacity: 1; transform: scaleY(1.3); } }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes pulse-green { 0%, 100% { box-shadow: 0 4px 20px rgba(37,211,102,0.45); } 50% { box-shadow: 0 4px 35px rgba(37,211,102,0.7); } }
-
-    .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease; }
-    .reveal.visible { opacity: 1; transform: translateY(0); }
-    .reveal-delay-1 { transition-delay: 0.1s; }
-    .reveal-delay-2 { transition-delay: 0.2s; }
-    .reveal-delay-3 { transition-delay: 0.3s; }
-
-    /* Responsive */
-    @media (max-width: 1024px) {
-      .footer-grid { grid-template-columns: 1fr 1fr; }
-      .room-detail-card { grid-template-columns: 1fr; }
-      .room-detail-card.reverse { direction: ltr; }
-      .room-detail-img { min-height: 280px; }
-      .booking-layout { grid-template-columns: 1fr; }
-      .contact-layout { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 768px) {
-      .nav-links, .nav-cta { display: none; }
-      .hamburger { display: flex; }
-      .mobile-nav { display: flex; }
-      .gallery-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
-      .gallery-item:nth-child(1), .gallery-item:nth-child(2), .gallery-item:nth-child(3),
-      .gallery-item:nth-child(4), .gallery-item:nth-child(5), .gallery-item:nth-child(6) { grid-column: auto; grid-row: auto; height: 180px; }
-      .footer-grid { grid-template-columns: 1fr; gap: 2rem; }
-      .amenities-list { grid-template-columns: 1fr; }
-      .form-row { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 480px) {
-      .hero-actions { flex-direction: column; }
-      .hero-actions .btn { justify-content: center; }
-      .room-detail-body { padding: 1.8rem; }
-      .booking-form-wrap { padding: 1.8rem; }
-      .gallery-grid { grid-template-columns: 1fr; }
-      .gallery-item { height: 200px !important; }
-    }
-  </style>
+<link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/pages.css" />
 </head>
 <body>
 
   <!-- =============================================
        NAVBAR
   ============================================== -->
+  <!-- Mobile Nav -->
+  <div class="mobile-nav" id="mobile-nav">
+    <button id="mobile-close" style="position:absolute;top:1.5rem;right:1.5rem;background:none;border:none;font-size:1.8rem;cursor:pointer;color:var(--bark);">✕</button>
+    <a href="#" data-page="home">Home</a>
+    <a href="#" data-page="rooms">Rooms</a>
+    <a href="#" data-page="booking">Booking</a>
+    <a href="#" data-page="contact">Contact</a>
+    <a href="#" class="btn btn-primary" data-page="booking" style="margin-top:1rem;">Book Now →</a>
+  </div>
+
   <nav class="navbar" id="navbar">
     <div class="container">
       <a href="#" class="logo" data-page="home">
@@ -357,15 +49,7 @@
     </div>
   </nav>
 
-  <!-- Mobile Nav -->
-  <div class="mobile-nav" id="mobile-nav">
-    <button id="mobile-close" style="position:absolute;top:1.5rem;right:1.5rem;background:none;border:none;font-size:1.8rem;cursor:pointer;color:var(--bark);">✕</button>
-    <a href="#" data-page="home">Home</a>
-    <a href="#" data-page="rooms">Rooms</a>
-    <a href="#" data-page="booking">Booking</a>
-    <a href="#" data-page="contact">Contact</a>
-    <a href="#" class="btn btn-primary" data-page="booking" style="margin-top:1rem;">Book Now →</a>
-  </div>
+ 
 
 
   <!-- =============================================
@@ -526,8 +210,7 @@
           <p class="section-label">Gallery</p>
           <h2 class="section-title">A Glimpse of Karibu Lodge</h2>
           <div class="divider"></div>
-          <p style="font-size:0.82rem;color:var(--earth-light);margin-top:0.5rem;">Replace image paths in the <code>CONFIG.images</code> section of the &lt;script&gt; tag below</p>
-        </div>
+          
         <div class="gallery-grid reveal">
           <div class="gallery-item"><img id="img-gallery-1" src="" alt="Karibu Lodge exterior" loading="lazy" /><div class="gallery-overlay"><span class="gallery-icon">🔍</span></div></div>
           <div class="gallery-item"><img id="img-gallery-2" src="" alt="Standard room interior" loading="lazy" /><div class="gallery-overlay"><span class="gallery-icon">🔍</span></div></div>
@@ -725,7 +408,7 @@
               <div id="booking-summary" style="background:var(--cream);border-radius:var(--radius);padding:1rem;font-size:0.85rem;line-height:1.8;margin-bottom:1.5rem;"></div>
               <div style="display:flex;gap:0.8rem;justify-content:center;flex-wrap:wrap;">
                 <a href="" class="btn btn-whatsapp cfg-whatsapp" data-msg="Hello! I just submitted a booking on your website." target="_blank" rel="noopener" style="font-size:0.82rem;padding:0.7rem 1.5rem;">💬 Chat on WhatsApp</a>
-                <button onclick="location.reload()" class="btn btn-outline" style="font-size:0.82rem;padding:0.7rem 1.5rem;">New Booking</button>
+                <button id="booking-reset" class="btn btn-outline" style="font-size:0.82rem;padding:0.7rem 1.5rem;">New Booking</button>
               </div>
             </div>
           </div>
@@ -811,9 +494,11 @@
   </div><!-- /page-contact -->
 
 
-  <!-- =============================================
-       FOOTER
-  ============================================== -->
+ 
+  
+
+
+  <!-- Footer -->
   <footer class="footer">
     <div class="container">
       <div class="footer-grid">
@@ -824,7 +509,7 @@
           </div>
           <p class="footer-desc">Comfortable, clean, and affordable accommodation in the heart of Tanzania. Feel at home at Karibu Lodge.</p>
           <div style="margin-top:1.5rem;display:flex;gap:0.8rem;">
-            <a href="" class="cfg-whatsapp" target="_blank" rel="noopener" style="width:38px;height:38px;background:rgba(255,255,255,0.1);border-radius:10px;display:grid;place-items:center;font-size:1rem;" title="WhatsApp">💬</a>
+            <a href="" class="cfg-whatsapp" target="_blank" rel="noopener noreferrer" style="width:38px;height:38px;background:rgba(255,255,255,0.1);border-radius:10px;display:grid;place-items:center;font-size:1rem;" title="WhatsApp">💬</a>
             <a href="" id="footer-phone" style="width:38px;height:38px;background:rgba(255,255,255,0.1);border-radius:10px;display:grid;place-items:center;font-size:1rem;" title="Call us">📞</a>
             <a href="" id="footer-email" style="width:38px;height:38px;background:rgba(255,255,255,0.1);border-radius:10px;display:grid;place-items:center;font-size:1rem;" title="Email us">✉️</a>
           </div>
@@ -849,7 +534,7 @@
           <h4>Contact</h4>
           <ul>
             <li><a href="" id="footer-phone-link" class="cfg-phone"></a></li>
-            <li><a href="" class="cfg-whatsapp" target="_blank" rel="noopener">WhatsApp</a></li>
+            <li><a href="" class="cfg-whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp</a></li>
             <li><a href="" id="footer-email-link" class="cfg-email"></a></li>
             <li><span class="cfg-address" style="color:rgba(255,255,255,0.55);font-size:0.87rem;"></span></li>
           </ul>
@@ -863,7 +548,7 @@
   </footer>
 
   <!-- Floating WhatsApp -->
-  <a href="" class="whatsapp-float cfg-whatsapp" data-msg="Hello! I'd like to enquire about Karibu Lodge." target="_blank" rel="noopener" title="Chat on WhatsApp">💬</a>
+  <a href="" class="whatsapp-float cfg-whatsapp" data-msg="Hello! I'd like to enquire about Karibu Lodge." target="_blank" rel="noopener noreferrer" title="Chat on WhatsApp">💬</a>
 
   <!-- Lightbox -->
   <div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;">
@@ -871,291 +556,9 @@
     <img id="lightbox-img" src="" alt="" style="max-width:92vw;max-height:88vh;object-fit:contain;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,0.5);" />
   </div>
 
-
-  <!-- =============================================
-       FIREBASE + ALL JAVASCRIPT
-  ============================================== -->
-  <script type="module">
-   
-
-    /* ============================================
-       ★ CONFIGURATION — Edit everything here ★
-       ============================================ */
-    const CONFIG = {
-      // ── Contact ──────────────────────────────
-      phone:       "+254794422088",       // ← Your phone number
-      whatsapp:    "+254794422088",           // ← Same number, digits only (no + or spaces)
-      email:       "info@karibulodge.co.tz", // ← Your email
-      address:     "Karibu Lodge, [Tegeta-kibaoni], Tanzania", // ← Your address
-
-      // ── Google Maps ──────────────────────────
-      // Steps: maps.google.com → search location → Share → Embed a map → copy src URL
-      mapEmbedUrl: "https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d3962.8673972968845!2d39.17967717584115!3d-6.663350593331586!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zNsKwMzknNDguMSJTIDM5wrAxMCc1Ni4xIkU!5e0!3m2!1sen!2ske!4v1775203075201!5m2!1sen!2ske",
-
-      // ── Room Images ──────────────────────────
-      // Use relative paths (e.g. "images/hero.jpg") or full URLs
-      images: {
-        hero:      "hero.jpg",       // Hero section background
-        standard1: "room 20,000.jpeg", // Standard room card
-        standard2: "room 20,000.jpeg", // Standard room detail
-        deluxe1:   "karibu lodge room 30,000.jpeg",   // Deluxe room card
-        deluxe2:   "karibu lodge room 30,000.jpeg",   // Deluxe room detail
-        gallery1:  "karibu lodge room 30,000.jpeg",  // Gallery image 1
-        gallery2:  "room 20,000.jpeg",
-        gallery3:  "room 30,000.jpeg",
-        gallery4:  "reception 1.jpeg",
-        gallery5:  "reception 2.jpeg",
-        gallery6:  "hero.jpg",
-      },
-
   
-    };
-
-    /* ── Firebase Init ── */
-   
-
-    /* ── Apply CONFIG to DOM ── */
-    function applyConfig() {
-      document.querySelectorAll('.cfg-phone').forEach(el => {
-        el.textContent = CONFIG.phone;
-        if (el.tagName === 'A') el.href = `tel:${CONFIG.phone.replace(/\s/g,'')}`;
-      });
-      document.querySelectorAll('.cfg-email').forEach(el => {
-        el.textContent = CONFIG.email;
-        if (el.tagName === 'A') el.href = `mailto:${CONFIG.email}`;
-      });
-      document.querySelectorAll('.cfg-address').forEach(el => { el.textContent = CONFIG.address; });
-      document.querySelectorAll('.cfg-whatsapp').forEach(el => {
-        const msg = el.dataset.msg || 'Hello! I would like to enquire about Karibu Lodge.';
-        el.href = `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`;
-      });
-
-      // Map
-      const mapFrame = document.getElementById('map-frame');
-      const mapPlaceholder = document.getElementById('map-placeholder');
-      if (mapFrame && !CONFIG.mapEmbedUrl.startsWith("REPLACE")) {
-        mapFrame.src = CONFIG.mapEmbedUrl;
-        mapFrame.style.display = 'block';
-        if (mapPlaceholder) mapPlaceholder.style.display = 'none';
-      }
-
-      // Footer links
-      const fp = document.getElementById('footer-phone');
-      const fe = document.getElementById('footer-email');
-      if (fp) fp.href = `tel:${CONFIG.phone.replace(/\s/g,'')}`;
-      if (fe) fe.href = `mailto:${CONFIG.email}`;
-
-      applyImages();
-    }
-
-    function applyImages() {
-      const map = {
-        'img-hero':       CONFIG.images.hero,
-        'img-standard-1': CONFIG.images.standard1,
-        'img-standard-2': CONFIG.images.standard2,
-        'img-deluxe-1':   CONFIG.images.deluxe1,
-        'img-deluxe-2':   CONFIG.images.deluxe2,
-        'img-gallery-1':  CONFIG.images.gallery1,
-        'img-gallery-2':  CONFIG.images.gallery2,
-        'img-gallery-3':  CONFIG.images.gallery3,
-        'img-gallery-4':  CONFIG.images.gallery4,
-        'img-gallery-5':  CONFIG.images.gallery5,
-        'img-gallery-6':  CONFIG.images.gallery6,
-      };
-      Object.entries(map).forEach(([id, src]) => {
-        const el = document.getElementById(id);
-        if (!el || src.startsWith("REPLACE")) return;
-        if (id === 'img-hero') {
-          el.style.backgroundImage = `url('${src}')`;
-          setTimeout(() => el.classList.add('loaded'), 100);
-        } else {
-          el.src = src;
-          el.onerror = () => {
-            const p = el.closest('.room-img-wrap,.room-detail-img,.gallery-item');
-            if (p) { el.style.display = 'none'; p.style.background = 'linear-gradient(135deg,#9B7355,#6B4F3A)'; }
-          };
-        }
-      });
-    }
-
-    /* ── Router ── */
-    const pages = { home: 'page-home', rooms: 'page-rooms', booking: 'page-booking', contact: 'page-contact' };
-
-    function navigate(page, push = true) {
-      Object.values(pages).forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-      });
-      const target = document.getElementById(pages[page]);
-      if (!target) return;
-      target.style.display = 'block';
-      document.querySelectorAll('[data-page]').forEach(a => a.classList.toggle('active', a.dataset.page === page));
-      if (push) window.location.hash = page === 'home' ? '' : page;
-      closeMobileNav();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      setTimeout(initReveal, 100);
-    }
-
-    window.addEventListener('hashchange', () => {
-      const h = window.location.hash.replace('#','') || 'home';
-      navigate(h in pages ? h : 'home', false);
-    });
-
-    document.addEventListener('click', e => {
-      const link = e.target.closest('[data-page]');
-      if (link) { e.preventDefault(); navigate(link.dataset.page); }
-    });
-
-    /* ── Navbar ── */
-    const navbar    = document.getElementById('navbar');
-    const hamburger = document.getElementById('hamburger');
-    const mobileNav = document.getElementById('mobile-nav');
-
-    window.addEventListener('scroll', () => navbar.classList.toggle('scrolled', window.scrollY > 50));
-
-    function closeMobileNav() {
-      mobileNav.classList.remove('open');
-      hamburger.classList.remove('active');
-      document.body.style.overflow = '';
-    }
-
-    hamburger.addEventListener('click', () => {
-      const open = mobileNav.classList.toggle('open');
-      hamburger.classList.toggle('active', open);
-      document.body.style.overflow = open ? 'hidden' : '';
-    });
-
-    document.getElementById('mobile-close').addEventListener('click', closeMobileNav);
-
-    /* ── Booking Form ── */
-    const bookingForm = document.getElementById('booking-form');
-    const submitBtn   = document.getElementById('submit-btn');
-    const successMsg  = document.getElementById('success-message');
-    const checkinEl   = document.getElementById('checkin');
-    const checkoutEl  = document.getElementById('checkout');
-
-    const today = new Date().toISOString().split('T')[0];
-    if (checkinEl)  checkinEl.min  = today;
-    if (checkoutEl) checkoutEl.min = today;
-
-    if (checkinEl) {
-      checkinEl.addEventListener('change', () => {
-        checkoutEl.min = checkinEl.value;
-        if (checkoutEl.value && checkoutEl.value <= checkinEl.value) checkoutEl.value = '';
-      });
-    }
-
-    // Pre-select room from "Book Now" buttons
-    document.addEventListener('click', e => {
-      const btn = e.target.closest('[data-room]');
-      if (btn) {
-        navigate('booking');
-        setTimeout(() => {
-          const sel = document.getElementById('room-type');
-          if (sel) sel.value = btn.dataset.room;
-        }, 150);
-      }
-    });
-
-if (bookingForm) {
-      bookingForm.addEventListener('submit', e => {
-        e.preventDefault();
-        if (!validateForm()) return;
-
-        const data = {
-          name:         document.getElementById('name').value.trim(),
-          phone:        document.getElementById('phone').value.trim(),
-          roomType:     document.getElementById('room-type').value,
-          checkInDate:  checkinEl.value,
-          checkOutDate: checkoutEl.value,
-        };
-
-        const nights = calcNights(data.checkInDate, data.checkOutDate);
-        const price  = data.roomType === 'standard' ? 20000 : 30000;
-        const total  = price * nights;
-        const roomLabel = data.roomType === 'standard' ? 'Standard Room – 20,000 TSH/night' : 'Deluxe Room – 30,000 TSH/night';
-
-        const msg = `🏨 *New Booking – Karibu Lodge*\n\n` +
-                    `👤 *Name:* ${data.name}\n` +
-                    `📞 *Phone:* ${data.phone}\n` +
-                    `🛏 *Room:* ${roomLabel}\n` +
-                    `📅 *Check-In:* ${fmtDate(data.checkInDate)}\n` +
-                    `📅 *Check-Out:* ${fmtDate(data.checkOutDate)}\n` +
-                    `🌙 *Nights:* ${nights}\n` +
-                    `💰 *Total:* ${total.toLocaleString()} TSH`;
-
-        showSuccess(data);
-        window.open(`https://wa.me/254794422088?text=${encodeURIComponent(msg)}`, '_blank');
-      });
-    }
-    function validateForm() {
-      let valid = true;
-      ['name','phone','room-type','checkin','checkout'].forEach(id => {
-        const input = document.getElementById(id);
-        const err   = document.getElementById(`${id}-error`);
-        const empty = !input?.value.trim();
-        input?.classList.toggle('error', empty);
-        if (err) err.style.display = empty ? 'block' : 'none';
-        if (empty) valid = false;
-      });
-      return valid;
-    }
-
-    function setLoading(on) {
-      submitBtn.classList.toggle('loading', on);
-      submitBtn.disabled = on;
-    }
-
-    function showSuccess(data) {
-      bookingForm.style.display = 'none';
-      successMsg.style.display  = 'block';
-      successMsg.classList.add('show');
-      const nights = calcNights(data.checkInDate, data.checkOutDate);
-      const price  = data.roomType === 'standard' ? 20000 : 30000;
-      const total  = price * nights;
-      const el = document.getElementById('booking-summary');
-      if (el) el.innerHTML = `<strong>${data.name}</strong> · ${cap(data.roomType)} Room<br>${fmtDate(data.checkInDate)} → ${fmtDate(data.checkOutDate)} · ${nights} night${nights!==1?'s':''}<br><span style="color:var(--gold-dark);font-weight:600">Total: ${total.toLocaleString()} TSH</span>`;
-    }
-
-    /* ── Scroll Reveal ── */
-    function initReveal() {
-      const obs = new IntersectionObserver(entries => {
-        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
-      }, { threshold: 0.12 });
-      document.querySelectorAll('.reveal:not(.visible)').forEach(el => obs.observe(el));
-    }
-
-    /* ── Gallery Lightbox ── */
-    function initLightbox() {
-      const overlay = document.getElementById('lightbox');
-      const lbImg   = document.getElementById('lightbox-img');
-      const lbClose = document.getElementById('lightbox-close');
-      const close   = () => { overlay.style.display = 'none'; document.body.style.overflow = ''; };
-
-      document.querySelectorAll('.gallery-item img').forEach(img => {
-        img.addEventListener('click', () => { lbImg.src = img.src; overlay.style.display = 'flex'; document.body.style.overflow = 'hidden'; });
-      });
-      lbClose.addEventListener('click', close);
-      overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-      document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
-    }
-
-    /* ── Helpers ── */
-    function calcNights(a, b) { return Math.max(1, Math.round((new Date(b)-new Date(a))/86400000)); }
-    function fmtDate(s) { return new Date(s+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
-    function cap(s) { return s.charAt(0).toUpperCase()+s.slice(1); }
-
-    /* ── Boot ── */
-    document.getElementById('year').textContent = new Date().getFullYear();
-    document.addEventListener('DOMContentLoaded', () => {
-      applyConfig();
-      const hash = window.location.hash.replace('#','') || 'home';
-      navigate(hash in pages ? hash : 'home', false);
-      initReveal();
-      initLightbox();
-      document.body.classList.add('ready');
-    });
-  </script>
+  
+  <script type="module" src="js/main.js"></script>
 
 </body>
 </html>
