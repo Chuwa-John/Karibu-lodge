@@ -26,6 +26,9 @@ export function navigate(page, push = true) {
   if (!target) return;
   target.style.display = 'block';
 
+  // Lets a page load its heavier parts the first time it is shown.
+  window.dispatchEvent(new CustomEvent('pagechange', { detail: page }));
+
   // Update active nav link
   document.querySelectorAll('[data-page]').forEach(a => {
     a.classList.toggle('active', a.dataset.page === page);

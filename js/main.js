@@ -6,7 +6,7 @@
 import { CONFIG }                                    from './config.js';
 import { navigate, initRouter }                      from './router.js';
 import { applyConfig, initNavbar, initReveal, initLightbox } from './ui.js';
-import { initBooking }                               from './booking.js';
+import { initBooking, initLiveBooking }              from './booking.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -19,8 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // 3. Init client-side router
   initRouter();
 
-  // 4. Init booking form
+  // 4. Init booking — the WhatsApp form, then live booking on top of it
   initBooking(CONFIG);
+  initLiveBooking(CONFIG);
 
   // 5. Navigate to correct page from URL hash
   const hash = window.location.hash.replace('#', '') || 'home';

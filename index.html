@@ -14,6 +14,22 @@
   <link rel="stylesheet" href="css/components.css" />
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/pages.css" />
+  <!-- Must stay the LAST stylesheet: breakpoint rules only win if they come after
+       the rules they override. See the note at the top of that file. -->
+  <link rel="stylesheet" href="css/responsive.css" />
+
+  <!-- Names only — nothing downloads until live booking is opened. Lets
+       js/lib/* use bare specifiers, so the same modules run in the browser
+       and under the Node test suite with no build step. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app":       "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js",
+      "firebase/auth":      "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js",
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js"
+    }
+  }
+  </script>
 </head>
 <body>
 
@@ -210,7 +226,7 @@
           <p class="section-label">Gallery</p>
           <h2 class="section-title">A Glimpse of Karibu Lodge</h2>
           <div class="divider"></div>
-          
+        </div>
         <div class="gallery-grid reveal">
           <div class="gallery-item"><img id="img-gallery-1" src="" alt="Karibu Lodge exterior" loading="lazy" /><div class="gallery-overlay"><span class="gallery-icon">🔍</span></div></div>
           <div class="gallery-item"><img id="img-gallery-2" src="" alt="Standard room interior" loading="lazy" /><div class="gallery-overlay"><span class="gallery-icon">🔍</span></div></div>
@@ -362,6 +378,9 @@
 
           <!-- Booking Form -->
           <div class="booking-form-wrap reveal reveal-delay-2">
+            <!-- WhatsApp form: the fallback, unchanged. Visible until live
+                 booking has actually started, and whenever it cannot. -->
+            <div id="wa-booking">
             <h3>Reserve Your Room</h3>
             <p class="form-subtitle">All fields required. We'll confirm within 1 hour.</p>
             <form id="booking-form" novalidate>
@@ -402,14 +421,67 @@
               </button>
             </form>
             <div class="success-message" id="success-message" style="display:none;">
-              <div class="success-icon">✅</div>
-              <h3>Booking Received!</h3>
-              <p style="margin-bottom:1rem;">Thank you for choosing Karibu Lodge. We'll contact you within 1 hour to confirm.</p>
+              <div class="success-icon" id="success-icon">✅</div>
+              <h3 id="success-title">Booking Received!</h3>
+              <p id="success-note" style="margin-bottom:1rem;">Thank you for choosing Karibu Lodge. We'll contact you within 1 hour to confirm.</p>
               <div id="booking-summary" style="background:var(--cream);border-radius:var(--radius);padding:1rem;font-size:0.85rem;line-height:1.8;margin-bottom:1.5rem;"></div>
+              <div id="wa-blocked-notice" style="display:none;background:rgba(230,57,70,0.08);border-left:3px solid #C1121F;border-radius:var(--radius);padding:1rem;font-size:0.82rem;line-height:1.7;text-align:left;margin-bottom:1.5rem;">
+                Your browser blocked the WhatsApp window, so <strong>we have not received this booking yet</strong>. Tap <strong>💬 Chat on WhatsApp</strong> below to send it — or call us on <a href="" class="cfg-phone" style="color:var(--gold-dark);font-weight:600;"></a>.
+              </div>
               <div style="display:flex;gap:0.8rem;justify-content:center;flex-wrap:wrap;">
                 <a href="" class="btn btn-whatsapp cfg-whatsapp" data-msg="Hello! I just submitted a booking on your website." target="_blank" rel="noopener" style="font-size:0.82rem;padding:0.7rem 1.5rem;">💬 Chat on WhatsApp</a>
                 <button id="booking-reset" class="btn btn-outline" style="font-size:0.82rem;padding:0.7rem 1.5rem;">New Booking</button>
               </div>
+            </div>
+            </div><!-- /wa-booking -->
+
+            <!-- Live booking. See initLiveBooking in js/booking.js. -->
+            <div id="live-loading" class="lb-loading" hidden>
+              <div class="spinner"></div>
+              <p>Checking which rooms are free…</p>
+              <p class="lb-small">Slow connection? <a href="" class="cfg-whatsapp" data-msg="Hello! I'd like to make a booking." target="_blank" rel="noopener">Book on WhatsApp instead</a></p>
+            </div>
+
+            <div id="live-booking" hidden>
+              <div id="lb-step-pick">
+                <h3>Reserve Your Room</h3>
+                <p class="form-subtitle">Pick your dates to see which rooms are free. Pay on arrival.</p>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="lb-checkin">Check-In Date</label>
+                    <input type="date" id="lb-checkin" />
+                  </div>
+                  <div class="form-group">
+                    <label for="lb-checkout">Check-Out Date</label>
+                    <input type="date" id="lb-checkout" />
+                  </div>
+                </div>
+                <div class="lb-status" id="lb-status" role="status" aria-live="polite"></div>
+                <div class="lb-rooms" id="lb-rooms"></div>
+                <!-- Outside the form on purpose. When a room is lost to someone
+                     else the selection clears and the form hides, and the message
+                     saying why must still be on screen. -->
+                <div class="lb-error" id="lb-error" role="alert" hidden></div>
+
+                <form id="lb-form" novalidate hidden>
+                  <div class="lb-summary" id="lb-summary"></div>
+                  <div class="form-group">
+                    <label for="lb-name">Full Name</label>
+                    <input type="text" id="lb-name" placeholder="e.g. Amina Hassan" autocomplete="name" />
+                    <div class="error-msg" id="lb-name-error"></div>
+                  </div>
+                  <div class="form-group">
+                    <label for="lb-phone">Phone Number</label>
+                    <input type="tel" id="lb-phone" placeholder="e.g. 0712 345 678" autocomplete="tel" />
+                    <div class="error-msg" id="lb-phone-error"></div>
+                  </div>
+                  <button type="submit" class="btn btn-primary btn-submit" id="lb-submit">
+                    <div class="spinner"></div>
+                    <span class="btn-text">🛏 Reserve This Room</span>
+                  </button>
+                </form>
+              </div>
+              <div class="lb-done" id="lb-done" hidden></div>
             </div>
           </div>
 

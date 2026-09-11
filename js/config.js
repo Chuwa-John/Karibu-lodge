@@ -11,6 +11,13 @@ export const CONFIG = {
   email:    "info@karibulodge.co.tz",
   address:  "Karibu Lodge, Tegeta-kibaoni, Tanzania",
 
+  // ── Booking ────────────────────────────
+  // true:  guests pick an actual room and it is held for them. Needs Firebase
+  //        set up in js/lib/env.js — until then the site quietly uses WhatsApp.
+  // false: the booking page is the WhatsApp form only. Flip this to switch
+  //        live booking off at once, without touching any other code.
+  liveBooking: true,
+
   // ── Google Maps ────────────────────────
   mapEmbedUrl: "https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d3962.8673972968845!2d39.17967717584115!3d-6.663350593331586!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zNsKwMzknNDguMSJTIDM5wrAxMCc1Ni4xIkU!5e0!3m2!1sen!2ske!4v1775203075201!5m2!1sen!2ske",
 

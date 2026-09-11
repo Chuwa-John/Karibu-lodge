@@ -1,0 +1,19 @@
+{
+  "name": "karibu-lodge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Karibu Lodge — website and booking system",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "emu": "firebase emulators:start --project demo-karibu",
+    "seed": "node scripts/seed.js",
+    "set-role": "node scripts/set-role.js"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase": "^12.18.0",
+    "firebase-admin": "^13.0.0",
+    "firebase-tools": "^13.35.1"
+  }
+}

@@ -37,8 +37,8 @@ function validateForm(fields) {
 }
 
 /* ── Success Message ── */
-function showSuccess(data, CONFIG) {
-  const { name, room, checkIn, checkOut } = data;
+function showSuccess(data) {
+  const { name, room, checkIn, checkOut, waUrl, blocked } = data;
   const nights = calcNights(checkIn, checkOut);
   const pricePerNight = room === 'deluxe' ? 30000 : 20000;
   const total = nights * pricePerNight;
@@ -58,19 +58,25 @@ function showSuccess(data, CONFIG) {
   successEl.classList.add('show');
   successEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-  // Update all WhatsApp links with booking details
-  const waMsg = encodeURIComponent(
-    `Hello Karibu Lodge! I'd like to confirm my booking:\n` +
-    `Name: ${sanitize(name)}\n` +
-    `Room: ${cap(sanitize(room))} Room\n` +
-    `Check-in: ${fmtDate(checkIn)}\n` +
-    `Check-out: ${fmtDate(checkOut)}\n` +
-    `Nights: ${nights}\n` +
-    `Estimated Total: TSH ${total.toLocaleString()}`
-  );
+  // Point every WhatsApp link at this booking, so the button in the panel
+  // carries the same details we just tried to hand off.
   document.querySelectorAll('.cfg-whatsapp').forEach(el => {
-    el.href = `https://wa.me/${CONFIG.whatsapp}?text=${waMsg}`;
+    el.href = waUrl;
   });
+
+  // A blocked hand-off means nothing has reached the lodge. Say that plainly
+  // instead of telling the guest their booking was received.
+  const notice = document.getElementById('wa-blocked-notice');
+  const icon   = document.getElementById('success-icon');
+  const title  = document.getElementById('success-title');
+  const note   = document.getElementById('success-note');
+
+  if (notice) notice.style.display = blocked ? 'block' : 'none';
+  if (icon)   icon.textContent  = blocked ? '⚠️' : '✅';
+  if (title)  title.textContent = blocked ? 'One More Tap Needed' : 'Booking Received!';
+  if (note)   note.textContent  = blocked
+    ? 'Your booking is ready to send — we have not received it yet.'
+    : "Thank you for choosing Karibu Lodge. We'll contact you within 1 hour to confirm.";
 }
 
 /* ── Main Init ── */
@@ -147,6 +153,34 @@ export function initBooking(CONFIG) {
 
     if (!validateForm(fields)) return;
 
+    const name      = nameEl.value.trim();
+    const room      = roomEl.value;
+    const checkIn   = checkInEl.value;
+    const checkOut  = checkOutEl.value;
+    const nights    = calcNights(checkIn, checkOut);
+    const price     = room === 'deluxe' ? 30000 : 20000;
+    const total     = nights * price;
+    const roomLabel = room === 'deluxe' ? 'Deluxe Room' : 'Standard Room';
+
+    const waMsg = encodeURIComponent(
+      `🏨 *New Booking — Karibu Lodge*\n\n` +
+      `👤 *Name:* ${name}\n` +
+      `🛏 *Room:* ${roomLabel}\n` +
+      `📅 *Check-in:* ${checkIn}\n` +
+      `📅 *Check-out:* ${checkOut}\n` +
+      `🌙 *Nights:* ${nights}\n` +
+      `💰 *Total:* TSH ${total.toLocaleString()}\n` +
+      `📞 *Phone:* ${phoneEl.value.trim()}`
+    );
+    const waUrl = `https://wa.me/${CONFIG.whatsapp}?text=${waMsg}`;
+
+    // Hand off to WhatsApp NOW, while we are still inside the click gesture
+    // that fired this submit. Deferring it into the setTimeout below breaks
+    // the gesture chain, so pop-up blockers swallow it silently and the guest
+    // is told "Booking Received!" with nothing actually sent.
+    const waWindow = window.open(waUrl, '_blank');
+    const blocked  = !waWindow || waWindow.closed || typeof waWindow.closed === 'undefined';
+
     // Loading state
     const submitBtn = form.querySelector('.btn-submit');
     submitBtn.classList.add('loading');
@@ -156,30 +190,8 @@ export function initBooking(CONFIG) {
       submitBtn.classList.remove('loading');
       submitBtn.disabled = false;
 
-      const name     = nameEl.value.trim();
-      const room     = roomEl.value;
-      const checkIn  = checkInEl.value;
-      const checkOut = checkOutEl.value;
-      const nights   = Math.max(1, Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000));
-      const price    = room === 'deluxe' ? 30000 : 20000;
-      const total    = nights * price;
-      const roomLabel = room === 'deluxe' ? 'Deluxe Room' : 'Standard Room';
-
-      // Auto-open WhatsApp with booking details
-      const waMsg = encodeURIComponent(
-        `🏨 *New Booking — Karibu Lodge*\n\n` +
-        `👤 *Name:* ${name}\n` +
-        `🛏 *Room:* ${roomLabel}\n` +
-        `📅 *Check-in:* ${checkIn}\n` +
-        `📅 *Check-out:* ${checkOut}\n` +
-        `🌙 *Nights:* ${nights}\n` +
-        `💰 *Total:* TSH ${total.toLocaleString()}\n` +
-        `📞 *Phone:* ${phoneEl.value.trim()}`
-      );
-      window.open(`https://wa.me/${CONFIG.whatsapp}?text=${waMsg}`, '_blank');
-
       form.style.display = 'none';
-      showSuccess({ name, room, checkIn, checkOut }, CONFIG);
+      showSuccess({ name, room, checkIn, checkOut, waUrl, blocked });
     }, 800);
   });
 
@@ -196,4 +208,56 @@ export function initBooking(CONFIG) {
       }
     });
   }
+}
+
+/* ── Live booking ─────────────────────────────────────────────────
+   Progressive enhancement over the WhatsApp form above, which stays exactly
+   as it was and is what the guest gets whenever live booking cannot start:
+   switched off in config, Firebase not configured yet, the CDN blocked, or no
+   connection. Loaded the first time the booking page opens, so the rest of
+   the site never downloads Firebase.                                        */
+
+export function initLiveBooking(CONFIG) {
+  if (CONFIG.liveBooking === false) return;
+
+  const wa      = document.getElementById('wa-booking');
+  const loading = document.getElementById('live-loading');
+  const live    = document.getElementById('live-booking');
+  if (!wa || !loading || !live) return;
+
+  let started = false;
+  let api = null;
+  let preferredType = null;
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-room]');
+    if (!btn) return;
+    preferredType = btn.dataset.room;
+    api?.setPreferredType(preferredType);
+  });
+
+  async function start() {
+    if (started) return;
+    started = true;
+    wa.hidden = true;
+    loading.hidden = false;
+    try {
+      // Ask the tiny env module first. Until Firebase is configured there is
+      // nothing to connect to, so the guest should not download it at all.
+      const { IS_CONFIGURED } = await import('./lib/env.js');
+      if (!IS_CONFIGURED) throw new Error('Firebase is not configured yet');
+      const mod = await import('./guest-booking.js');
+      api = await mod.mountLiveBooking({ CONFIG, preferredType });
+      if (preferredType) api.setPreferredType(preferredType);
+      loading.hidden = true;
+      live.hidden = false;
+    } catch (err) {
+      console.warn('[live booking] unavailable, using the WhatsApp form instead:', err);
+      loading.hidden = true;
+      live.hidden = true;
+      wa.hidden = false;
+    }
+  }
+
+  window.addEventListener('pagechange', e => { if (e.detail === 'booking') start(); });
 }

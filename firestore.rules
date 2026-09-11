@@ -1,0 +1,161 @@
+rules_version = '2';
+
+// Karibu Lodge — booking rules.
+//
+// The shape of this file follows one idea: availability is public, guests are
+// private. The `nights` ledger carries no personal data, so anyone may read it
+// to see what is free. Everything with a guest's name or phone on it is staff-only.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ── Identity ─────────────────────────────────────────── */
+
+    function role() {
+      return request.auth != null ? request.auth.token.get('role', '') : '';
+    }
+    function signedIn() { return request.auth != null; }
+    function isStaff()  { return role() == 'reception' || role() == 'admin'; }
+    function isAdmin()  { return role() == 'admin'; }
+
+    /* ── Shared validators ────────────────────────────────── */
+
+    function isDate(s) {
+      return s is string && s.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    // A guest hold is short-lived by construction. 2h is the product rule;
+    // the extra 5 minutes absorbs clock skew between client and server.
+    function isValidHold(t) {
+      return t is timestamp
+          && t > request.time
+          && t < request.time + duration.value(125, 'm');
+    }
+
+    /* ── Rooms: public catalogue, owner-managed ───────────── */
+
+    match /rooms/{roomId} {
+      allow read: if true;
+
+      function validRoom(d) {
+        return d.number is int && d.number >= 1
+            && d.type in ['standard', 'deluxe']
+            && d.rate is int && d.rate >= 1000 && d.rate <= 10000000
+            && d.active is bool;
+      }
+
+      // The desk never edits rooms. The owner may change the price or take a
+      // room off sale, and nothing else: number and type are what guests booked.
+      // A room is never deleted, because bookings and the ledger point at it.
+      allow create: if isAdmin() && validRoom(request.resource.data);
+      allow update: if isAdmin() && validRoom(request.resource.data)
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['rate', 'active', 'updatedAt', 'updatedBy']);
+      allow delete: if false;
+    }
+
+    /* ── Nights: the allocation ledger ────────────────────────
+       One doc per room per night, id `{roomId}_{YYYY-MM-DD}`.
+       Deliberately carries NO guest data so it can be world-readable.
+       `rate` is stamped by staff at confirmation, never by a guest, so
+       revenue reporting only ever counts money a human agreed to.        */
+
+    match /nights/{nightId} {
+      allow read: if true;
+
+      function guestHold() {
+        let d = request.resource.data;
+        return signedIn()
+            && d.keys().hasOnly(['roomId', 'date', 'bookingId', 'status', 'holdExpiresAt'])
+            && d.keys().hasAll(['roomId', 'date', 'bookingId', 'status', 'holdExpiresAt'])
+            && d.status == 'held'
+            && d.roomId is string
+            && d.bookingId is string
+            && isDate(d.date)
+            && isValidHold(d.holdExpiresAt)
+            && nightId == d.roomId + '_' + d.date;
+      }
+
+      // A cell only stops blocking once its hold has actually lapsed.
+      function cellExpired() {
+        return resource.data.status == 'held'
+            && resource.data.holdExpiresAt < request.time;
+      }
+
+      allow create: if isStaff() || guestHold();
+      allow update: if isStaff() || (guestHold() && cellExpired());
+      allow delete: if isStaff();
+    }
+
+    /* ── Bookings: everything with a guest on it ──────────── */
+
+    match /bookings/{bookingId} {
+      allow read: if isStaff();
+
+      function guestBooking() {
+        let d = request.resource.data;
+        let room = get(/databases/$(database)/documents/rooms/$(d.roomId)).data;
+        return signedIn()
+            && d.status == 'pending'
+            && d.source == 'web'
+            && d.createdBy == request.auth.uid
+            && d.guestName is string && d.guestName.size() >= 2 && d.guestName.size() <= 100
+            && d.guestPhone is string && d.guestPhone.matches('^[+]?[0-9]{9,15}$')
+            && isDate(d.checkIn) && isDate(d.checkOut)
+            && d.checkOut > d.checkIn
+            && d.nights is int && d.nights >= 1 && d.nights <= 30
+            && room.active == true
+            && d.ratePerNight == room.rate
+            && d.total == d.ratePerNight * d.nights
+            && isValidHold(d.holdExpiresAt);
+      }
+
+      // Reception moves a booking through its lifecycle but never touches money.
+      function receptionEdit() {
+        return isStaff()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                 'status', 'notes', 'roomId', 'roomNumber',
+                 'holdExpiresAt', 'cancelReason', 'updatedAt', 'updatedBy'
+               ]);
+      }
+
+      allow create: if isStaff() || guestBooking();
+      allow update: if receptionEdit() || isAdmin();
+      allow delete: if false;   // cancelled is a status, not an absence
+    }
+
+    /* ── Staff directory ──────────────────────────────────── */
+
+    match /staff/{uid} {
+      allow read:  if isStaff();
+      allow write: if isAdmin();
+    }
+
+    /* ── Audit: append-only; cannot be forged or backdated ── */
+
+    match /audit/{entryId} {
+      allow read: if isAdmin();
+
+      // actor must be whoever is signed in, and `at` must be the server's own
+      // clock (serverTimestamp), so nobody can write an entry in someone else's
+      // name or date one to before it happened.
+      function validEntry() {
+        let d = request.resource.data;
+        return d.keys().hasAll(['actor', 'action', 'summary', 'at'])
+            && d.keys().hasOnly(['actor', 'action', 'summary', 'at',
+                                 'bookingId', 'roomId', 'before', 'after'])
+            && d.actor == request.auth.uid
+            && d.at == request.time
+            && d.action in ['walk_in', 'confirm', 'cancel', 'check_in',
+                            'check_out', 'expire', 'room_update']
+            && d.summary is string && d.summary.size() <= 300
+            && (!('before' in d) || d.before is map)
+            && (!('after' in d) || d.after is map);
+      }
+
+      allow create: if isStaff() && validEntry();
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

@@ -1,0 +1,222 @@
+/* css/staff.css — the reception console.
+   Denser and plainer than the public site: this is a tool someone uses on a
+   busy desk, not a page they browse. Big targets, obvious status, no motion. */
+
+:root {
+  --gold: #C9A84C; --gold-dark: #A07830;
+  --earth: #6B4F3A; --earth-light: #9B7355;
+  --cream: #FAF6F0; --cream-dark: #F0E8DC;
+  --bark: #2C1F14; --white: #fff; --mist: #C8B89A;
+  --ok: #1B7F4B; --ok-bg: #E6F4EC;
+  --warn: #B26A00; --warn-bg: #FDF1DF;
+  --bad: #C1121F; --bad-bg: #FBE9EA;
+  --info: #1C5D99; --info-bg: #E8F1FA;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(44,31,20,.12), 0 6px 18px rgba(44,31,20,.06);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+/* Class selectors like .modal{display:grid} outbid the UA sheet rule for
+   [hidden], so state the intent explicitly. */
+[hidden] { display: none !important; }
+body {
+  font-family: 'Jost', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: var(--cream); color: var(--bark); line-height: 1.5; font-size: 15px;
+}
+h1, h2, h3 { font-family: 'Cormorant Garamond', Georgia, serif; line-height: 1.2; }
+button, input, select, textarea { font: inherit; }
+
+/* ── Shell ── */
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 1rem;
+  background: var(--bark); color: var(--white);
+  padding: .7rem 1.25rem;
+}
+.topbar .brand { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.35rem; }
+.topbar .brand span { color: var(--gold); }
+.topbar .spacer { flex: 1; }
+.topbar .who { font-size: .8rem; color: rgba(255,255,255,.65); text-align: right; }
+.topbar .who strong { display: block; color: var(--white); font-weight: 500; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 1.25rem; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  padding: .55rem 1rem; border: 1px solid transparent; border-radius: var(--radius);
+  background: var(--cream-dark); color: var(--bark);
+  font-size: .85rem; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.btn:hover:not(:disabled) { filter: brightness(.96); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--gold-dark); color: var(--white); }
+.btn-ok      { background: var(--ok);  color: var(--white); }
+.btn-danger  { background: var(--white); color: var(--bad); border-color: #E7C3C6; }
+.btn-ghost   { background: transparent; border-color: var(--cream-dark); }
+.btn-sm      { padding: .35rem .7rem; font-size: .78rem; }
+.btn-block   { width: 100%; }
+
+/* ── Panels ── */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
+.panel { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.panel > header {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .8rem 1rem; border-bottom: 1px solid var(--cream-dark);
+}
+.panel > header h2 { font-size: 1.15rem; flex: 1; }
+.panel .body { padding: .5rem; }
+.count {
+  min-width: 1.6rem; padding: .1rem .45rem; border-radius: 99px;
+  background: var(--cream-dark); color: var(--earth);
+  font-size: .75rem; font-weight: 600; text-align: center;
+}
+.count.alert { background: var(--bad); color: var(--white); }
+
+/* ── Booking rows ── */
+.row {
+  display: grid; grid-template-columns: auto 1fr auto; gap: .75rem;
+  align-items: center; padding: .7rem .75rem; border-radius: 8px;
+}
+.row + .row { border-top: 1px solid var(--cream-dark); }
+.row:hover { background: var(--cream); }
+.roomchip {
+  width: 42px; height: 42px; border-radius: 9px; display: grid; place-items: center;
+  background: var(--cream-dark); color: var(--earth);
+  font-weight: 600; font-size: .7rem; line-height: 1.1; text-align: center;
+}
+.roomchip b { display: block; font-size: 1.05rem; }
+.roomchip.deluxe { background: #F3E7C8; color: var(--gold-dark); }
+.who-line { font-weight: 500; }
+.meta { font-size: .8rem; color: var(--earth-light); }
+.meta .sep { color: var(--mist); margin: 0 .35rem; }
+.actions { display: flex; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; }
+
+.tag {
+  display: inline-block; padding: .1rem .5rem; border-radius: 99px;
+  font-size: .7rem; font-weight: 600; letter-spacing: .02em;
+}
+.tag-pending    { background: var(--warn-bg); color: var(--warn); }
+.tag-confirmed  { background: var(--ok-bg);   color: var(--ok); }
+.tag-checked_in { background: var(--info-bg); color: var(--info); }
+.tag-checked_out, .tag-expired, .tag-cancelled { background: var(--cream-dark); color: var(--earth-light); }
+.tag-walkin     { background: var(--cream-dark); color: var(--earth); }
+
+.expiry { font-size: .75rem; font-weight: 600; color: var(--warn); }
+.expiry.gone { color: var(--bad); }
+
+.empty { padding: 1.5rem 1rem; text-align: center; color: var(--earth-light); font-size: .85rem; }
+
+/* ── Availability strip ── */
+.avail { display: grid; gap: .3rem; padding: .5rem; }
+.avail-row { display: grid; grid-template-columns: 54px 1fr; gap: .4rem; align-items: center; }
+.avail-cells { display: grid; gap: 3px; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.cell { height: 26px; border-radius: 4px; background: var(--ok-bg); display: grid; place-items: center;
+        font-size: .6rem; color: var(--earth-light); }
+.cell.taken { background: var(--bad-bg); }
+.cell.held  { background: var(--warn-bg); }
+.avail-dates { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px;
+               font-size: .6rem; color: var(--earth-light); text-align: center; }
+
+/* ── Forms ── */
+.field { margin-bottom: .7rem; }
+.field label { display: block; font-size: .75rem; font-weight: 500; color: var(--earth);
+               text-transform: uppercase; letter-spacing: .06em; margin-bottom: .25rem; }
+.field input, .field select, .field textarea {
+  width: 100%; padding: .55rem .7rem; border: 1px solid var(--cream-dark);
+  border-radius: 8px; background: var(--white); color: var(--bark);
+}
+.field input:focus, .field select:focus { outline: 2px solid var(--gold); outline-offset: -1px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+
+.notice { padding: .6rem .8rem; border-radius: 8px; font-size: .82rem; margin-bottom: .7rem; }
+.notice-bad  { background: var(--bad-bg);  color: var(--bad); }
+.notice-ok   { background: var(--ok-bg);   color: var(--ok); }
+.notice-info { background: var(--info-bg); color: var(--info); }
+
+/* ── Login ── */
+.login { max-width: 380px; margin: 12vh auto; }
+.login .panel { padding: 1.75rem; }
+.login h1 { font-size: 1.7rem; margin-bottom: .25rem; }
+.login p.sub { font-size: .85rem; color: var(--earth-light); margin-bottom: 1.25rem; }
+
+/* ── Modal ── */
+.modal { position: fixed; inset: 0; background: rgba(44,31,20,.55); z-index: 50;
+         display: grid; place-items: center; padding: 1rem; }
+.modal .panel { width: min(560px, 100%); max-height: 90vh; overflow: auto; }
+.modal .body { padding: 1.1rem; }
+
+/* ── In-page dialog (js/lib/ask.js) ── */
+dialog.ask {
+  border: none; border-radius: var(--radius); padding: 0; margin: auto;
+  width: min(440px, calc(100% - 2rem)); color: var(--bark);
+  box-shadow: 0 20px 60px rgba(44,31,20,.3);
+}
+dialog.ask::backdrop { background: rgba(44,31,20,.55); }
+dialog.ask .ask-body { padding: 1.25rem; }
+dialog.ask h3 { font-size: 1.35rem; margin-bottom: .4rem; }
+dialog.ask p  { font-size: .9rem; color: var(--earth); margin-bottom: 1rem; }
+.ask-actions  { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .75rem; }
+
+@media (max-width: 860px) {
+  .grid { grid-template-columns: 1fr; }
+  .row { grid-template-columns: auto 1fr; }
+  .actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+/* The reference a guest was given, so they can quote it on the phone. */
+.ref { font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: .75rem; letter-spacing: .05em; color: var(--earth); }
+
+/* ── Alerts (js/lib/alerts.js, js/lib/chime.js) ───────────────────
+   Motion is deliberate here: an unhandled booking is the one thing on this
+   screen that should catch the eye from across the room. */
+.alert-banner {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .8rem 1rem; margin-bottom: 1rem; border-radius: var(--radius);
+  background: #FFF4D6; border: 2px solid var(--gold); color: var(--bark);
+  font-weight: 500; box-shadow: var(--shadow);
+  animation: alert-pulse 1.6s ease-in-out infinite;
+}
+.alert-bell { font-size: 1.5rem; line-height: 1; }
+#alert-text { flex: 1; }
+@keyframes alert-pulse { 50% { box-shadow: 0 0 0 6px rgba(201,168,76,.35); } }
+.sound-chip { color: #fff; background: transparent; border-color: rgba(255,255,255,.25); }
+.sound-chip[data-state="suspended"] { background: var(--bad); border-color: var(--bad); }
+.row-new { background: #FFF8E6; box-shadow: inset 3px 0 0 var(--gold); }
+.expiry.urgent { color: var(--bad); }
+@media (prefers-reduced-motion: reduce) { .alert-banner { animation: none; } }
+
+/* ── Owner tabs (js/admin-ui.js) ─────────────────────────────── */
+.tabs { display: flex; gap: .25rem; margin-bottom: 1rem; border-bottom: 1px solid var(--cream-dark); overflow-x: auto; }
+.tab {
+  background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  padding: .6rem .9rem; font-size: .88rem; font-weight: 500; color: var(--earth-light);
+  cursor: pointer; white-space: nowrap;
+}
+.tab:hover { color: var(--bark); }
+.tab.is-active { color: var(--bark); border-bottom-color: var(--gold-dark); }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; padding: .5rem; }
+.kpi { background: var(--cream); border-radius: 8px; padding: .75rem .9rem; }
+.kpi-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--earth-light); }
+.kpi-value { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.6rem; font-weight: 600; line-height: 1.2; }
+.kpi-sub { font-size: .72rem; color: var(--earth-light); }
+.pad { padding: .25rem .75rem .5rem; }
+.pad-top { margin: .75rem .5rem .25rem; }
+
+.rep-days { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(12px, 1fr); gap: 2px; padding: .5rem .75rem 1rem; overflow-x: auto; }
+.rep-day { display: grid; gap: 2px; }
+.rep-bar { height: 64px; display: flex; flex-direction: column-reverse; background: var(--cream); border-radius: 3px; overflow: hidden; }
+.rep-sold { background: var(--gold-dark); }
+.rep-held { background: var(--warn-bg); }
+.rep-date { font-size: .58rem; color: var(--earth-light); text-align: center; }
+
+.table-wrap { overflow-x: auto; }
+table.data { width: 100%; border-collapse: collapse; font-size: .85rem; }
+table.data th, table.data td { text-align: left; padding: .55rem .75rem; border-bottom: 1px solid var(--cream-dark); vertical-align: middle; }
+table.data th { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--earth); font-weight: 600; }
+table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
+table.data tfoot th { border-bottom: none; color: var(--bark); }
+table.data .nowrap { white-space: nowrap; }
+.rate-input { width: 9rem; padding: .4rem .55rem; border: 1px solid var(--cream-dark); border-radius: 6px; font-variant-numeric: tabular-nums; }
+.switch { display: inline-flex; align-items: center; gap: .4rem; font-size: .82rem; cursor: pointer; }
+.month-input { padding: .3rem .5rem; border: 1px solid var(--cream-dark); border-radius: 6px; }

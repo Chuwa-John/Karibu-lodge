@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Reception — Karibu Lodge</title>
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛎️</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/staff.css" />
+
+  <!-- Lets js/lib/* use bare specifiers, so the same modules run here and
+       under the Node test suite with no build step. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app":       "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js",
+      "firebase/auth":      "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js",
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- ── Sign in ─────────────────────────────────────────── -->
+  <div id="view-login" class="login" hidden>
+    <div class="panel">
+      <h1>Reception</h1>
+      <p class="sub">Karibu Lodge staff sign-in</p>
+      <div id="login-error" class="notice notice-bad" hidden></div>
+      <form id="login-form">
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="login-btn">Sign in</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── No role ─────────────────────────────────────────── -->
+  <div id="view-norole" class="login" hidden>
+    <div class="panel">
+      <h1>Not authorised</h1>
+      <p class="sub">This account is signed in but has no reception or admin role.</p>
+      <div class="notice notice-info">
+        An administrator grants access by running
+        <code>node scripts/set-role.js &lt;email&gt; reception</code>.
+        You then need to sign out and back in for it to take effect.
+      </div>
+      <button class="btn btn-ghost btn-block" data-act="signout">Sign out</button>
+    </div>
+  </div>
+
+  <!-- ── Console ─────────────────────────────────────────── -->
+  <div id="view-console" hidden>
+    <div class="topbar">
+      <div class="brand">Karibu <span>Reception</span></div>
+      <div class="spacer"></div>
+      <button type="button" id="sound-chip" class="btn btn-sm sound-chip" data-act="sound" data-state="suspended">🔕 Sound off</button>
+      <div class="who"><strong id="who-name">—</strong><span id="who-role">—</span></div>
+      <button class="btn btn-sm btn-ghost" data-act="signout" style="color:#fff;border-color:rgba(255,255,255,.25)">Sign out</button>
+    </div>
+
+    <div class="wrap">
+      <!-- Alerts. Anything that would stop the desk hearing about a booking is
+           shown here instead of failing quietly. See js/lib/alerts.js. -->
+      <div id="live-warning" class="notice notice-bad" role="alert" hidden>
+        Not connected. New bookings will not appear here until the connection is back.
+      </div>
+      <div id="sound-warning" class="notice notice-bad" role="status" hidden></div>
+      <div id="alert-banner" class="alert-banner" role="alert" hidden>
+        <span class="alert-bell" aria-hidden="true">🛎️</span>
+        <div id="alert-text"></div>
+        <button type="button" class="btn btn-sm btn-primary" data-act="ack">Got it</button>
+      </div>
+      <div id="console-error" class="notice notice-bad" hidden></div>
+
+      <!-- Owner only. Hiding these from reception is a convenience; the
+           security rules are what refuse reception. See js/admin-ui.js. -->
+      <nav class="tabs" id="admin-tabs" role="tablist" aria-label="Owner views" hidden>
+        <button type="button" class="tab is-active" data-tab="desk" role="tab">Desk</button>
+        <button type="button" class="tab" data-tab="reports" role="tab">Reports</button>
+        <button type="button" class="tab" data-tab="rooms" role="tab">Rooms &amp; prices</button>
+        <button type="button" class="tab" data-tab="staff" role="tab">Staff</button>
+        <button type="button" class="tab" data-tab="audit" role="tab">Record</button>
+      </nav>
+
+      <div id="tab-desk">
+      <div class="panel" style="margin-bottom:1.25rem">
+        <header>
+          <h2>New requests</h2>
+          <span class="count" id="count-pending">0</span>
+          <div class="spacer" style="flex:1"></div>
+          <button class="btn btn-sm btn-ghost" data-act="sweep">Clear lapsed</button>
+          <button class="btn btn-sm btn-primary" data-act="walkin">+ Walk-in</button>
+        </header>
+        <div class="body" id="list-pending"></div>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <header><h2>Arriving today</h2><span class="count" id="count-arrivals">0</span></header>
+          <div class="body" id="list-arrivals"></div>
+        </div>
+        <div class="panel">
+          <header><h2>Leaving today</h2><span class="count" id="count-departures">0</span></header>
+          <div class="body" id="list-departures"></div>
+        </div>
+        <div class="panel">
+          <header><h2>In house</h2><span class="count" id="count-inhouse">0</span></header>
+          <div class="body" id="list-inhouse"></div>
+        </div>
+        <div class="panel">
+          <header><h2>Next 14 nights</h2></header>
+          <div class="body"><div class="avail" id="avail-grid"></div></div>
+        </div>
+      </div>
+      </div><!-- /tab-desk -->
+
+      <div id="tab-reports" hidden>
+        <div class="panel">
+          <header>
+            <h2>Occupancy &amp; revenue</h2>
+            <button type="button" class="btn btn-sm btn-ghost" data-rep="prev" aria-label="Previous month">‹</button>
+            <input type="month" id="rep-month" class="month-input" aria-label="Month" />
+            <button type="button" class="btn btn-sm btn-ghost" data-rep="next" aria-label="Next month">›</button>
+          </header>
+          <div class="body">
+            <div id="rep-error" class="notice notice-bad" hidden></div>
+            <div class="kpis" id="rep-kpis"></div>
+            <p class="meta pad" id="rep-note"></p>
+            <div class="rep-days" id="rep-days"></div>
+            <div class="table-wrap"><table class="data" id="rep-rooms"></table></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-rooms" hidden>
+        <div class="panel">
+          <header><h2>Rooms &amp; prices</h2></header>
+          <div class="body">
+            <p class="meta pad">A new price applies to bookings made from now on. Bookings already made keep the price they were made at.</p>
+            <div id="rooms-notice" class="notice" role="status" hidden></div>
+            <div class="table-wrap"><table class="data" id="rooms-table"></table></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-staff" hidden>
+        <div class="panel">
+          <header><h2>Staff</h2></header>
+          <div class="body">
+            <div class="table-wrap"><table class="data" id="staff-table"></table></div>
+            <div class="notice notice-info pad-top">
+              Adding or removing someone needs the lodge's service account, so it is done from a computer:
+              <code>node scripts/set-role.js &lt;email&gt; reception</code>, or <code>none</code> to remove access.
+              A removed person's sign-in stops working within the hour.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-audit" hidden>
+        <div class="panel">
+          <header>
+            <h2>Record</h2>
+            <button type="button" class="btn btn-sm btn-ghost" data-audit="refresh">Refresh</button>
+          </header>
+          <div class="body">
+            <div id="audit-error" class="notice notice-bad" hidden></div>
+            <div class="table-wrap"><table class="data" id="audit-table"></table></div>
+            <p class="meta pad">The latest 100 actions. Entries cannot be edited or deleted, not even by the owner.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Walk-in modal ───────────────────────────────────── -->
+  <div id="walkin-modal" class="modal" hidden>
+    <div class="panel">
+      <header><h2>Walk-in booking</h2><div style="flex:1"></div>
+        <button class="btn btn-sm btn-ghost" data-act="walkin-close">✕</button></header>
+      <div class="body">
+        <div id="walkin-error" class="notice notice-bad" hidden></div>
+        <form id="walkin-form">
+          <div class="field">
+            <label for="w-name">Guest name</label>
+            <input type="text" id="w-name" required />
+          </div>
+          <div class="field">
+            <label for="w-phone">Phone</label>
+            <input type="tel" id="w-phone" placeholder="+255 700 000 000" required />
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="w-checkin">Check-in</label>
+              <input type="date" id="w-checkin" required />
+            </div>
+            <div class="field">
+              <label for="w-checkout">Check-out</label>
+              <input type="date" id="w-checkout" required />
+            </div>
+          </div>
+          <div class="field">
+            <label for="w-room">Room</label>
+            <select id="w-room" required><option value="">— pick dates first —</option></select>
+          </div>
+          <div class="field">
+            <label for="w-notes">Notes (optional)</label>
+            <input type="text" id="w-notes" />
+          </div>
+          <div id="walkin-total" class="notice notice-info" hidden></div>
+          <button type="submit" class="btn btn-primary btn-block" id="walkin-submit">
+            Take booking
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── In-page confirm / text prompt ─────────────────────
+       Never window.prompt: a browser can suppress it and answer on the
+       user's behalf, which turns Decline into a silent no-op. -->
+  <dialog id="askDialog" class="ask">
+    <div class="ask-body">
+      <h3 data-ask="title"></h3>
+      <p data-ask="message"></p>
+      <div class="field" data-ask="field" hidden>
+        <label for="ask-input" data-ask="label"></label>
+        <input type="text" id="ask-input" data-ask="input" autocomplete="off" />
+      </div>
+      <div class="ask-actions">
+        <button type="button" class="btn btn-ghost" data-ask="cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" data-ask="ok">OK</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/staff.js"></script>
+</body>
+</html>

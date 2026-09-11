@@ -1,0 +1,39 @@
+/* css/responsive.css
+   Breakpoint overrides. This MUST stay the last stylesheet on the page.
+
+   Every rule here restyles a selector that another stylesheet also defines, and
+   a media query adds no specificity, so whichever rule comes later wins. When
+   the single stylesheet was split into files on 2026-05-02 these rules landed
+   at the end of base.css, which loads first, and every one of them was quietly
+   overridden. On a phone the booking form sat off-screen to the right, the nav
+   links overflowed, and the hamburger never appeared.
+   Guarded by tests/css-cascade.test.js. */
+
+@media (max-width: 1024px) {
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+  .room-detail-card { grid-template-columns: 1fr; }
+  .room-detail-card.reverse { direction: ltr; }
+  .room-detail-img { min-height: 280px; }
+  .booking-layout { grid-template-columns: 1fr; }
+  .contact-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .nav-links, .nav-cta { display: none; }
+  .hamburger { display: flex; }
+  .mobile-nav { display: flex; }
+  .gallery-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
+  .gallery-item:nth-child(1), .gallery-item:nth-child(2), .gallery-item:nth-child(3),
+  .gallery-item:nth-child(4), .gallery-item:nth-child(5), .gallery-item:nth-child(6) { grid-column: auto; grid-row: auto; height: 180px; }
+  .footer-grid { grid-template-columns: 1fr; gap: 2rem; }
+  .amenities-list { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .hero-actions { flex-direction: column; }
+  .hero-actions .btn { justify-content: center; }
+  .room-detail-body { padding: 1.8rem; }
+  .booking-form-wrap { padding: 1.8rem; }
+  .gallery-grid { grid-template-columns: 1fr; }
+  .gallery-item { height: 200px !important; }
+}
+  
