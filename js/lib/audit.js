@@ -14,6 +14,7 @@ import { serverTimestamp } from 'firebase/firestore';
 
 export const AUDIT_ACTIONS = [
   'walk_in', 'confirm', 'cancel', 'check_in', 'check_out', 'expire', 'room_update',
+  'extend_hold',
 ];
 
 export const AUDIT_LABELS = {
@@ -24,6 +25,7 @@ export const AUDIT_LABELS = {
   check_out:   'Guest checked out',
   expire:      'Lapsed hold cleared',
   room_update: 'Room changed',
+  extend_hold: 'Hold extended',
 };
 
 export function auditEntry(actor, action, { bookingId, roomId, summary = '', before, after } = {}) {

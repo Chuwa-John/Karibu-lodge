@@ -5,7 +5,7 @@ import {
   initializeTestEnvironment, assertFails, assertSucceeds,
 } from '@firebase/rules-unit-testing';
 import {
-  doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp,
+  doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 
@@ -143,9 +143,24 @@ describe('nights ledger', () => {
   });
 });
 
+/** The first hold of a new window, counted the way the engine counts it. */
+const counting = (over = {}) => ({ count: 1, windowStart: serverTimestamp(), ...over });
+
+/**
+ * A booking as the site actually sends it: the booking and the count against
+ * the hold limit in ONE commit. Neither is allowed without the other, so a
+ * test that means to check something else must still send both.
+ */
+function guestBooks(db, { id = 'bk1', uid = 'guest-abc', data = {}, counted = counting() } = {}) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, `bookings/${id}`), booking(data));
+  if (counted) batch.set(doc(db, `webHolds/${uid}`), counted);
+  return batch.commit();
+}
+
 describe('bookings', () => {
   test('a guest may submit a pending booking', async () => {
-    await assertSucceeds(setDoc(doc(guest(), 'bookings/bk1'), booking()));
+    await assertSucceeds(guestBooks(guest()));
   });
 
   test('a guest may not read bookings, those are other peoples phone numbers', async () => {
@@ -156,25 +171,22 @@ describe('bookings', () => {
   });
 
   test('a guest may not invent their own rate', async () => {
-    await assertFails(setDoc(doc(guest(), 'bookings/bk1'),
-      booking({ ratePerNight: 1, total: 2 })));
+    await assertFails(guestBooks(guest(), { data: { ratePerNight: 1, total: 2 } }));
   });
   test('the total must match rate x nights', async () => {
-    await assertFails(setDoc(doc(guest(), 'bookings/bk1'), booking({ total: 100 })));
+    await assertFails(guestBooks(guest(), { data: { total: 100 } }));
   });
   test('a guest may not self-confirm', async () => {
-    await assertFails(setDoc(doc(guest(), 'bookings/bk1'), booking({ status: 'confirmed' })));
+    await assertFails(guestBooks(guest(), { data: { status: 'confirmed' } }));
   });
   test('a guest may not book a room that does not exist', async () => {
-    await assertFails(setDoc(doc(guest(), 'bookings/bk1'), booking({ roomId: 'room-99' })));
+    await assertFails(guestBooks(guest(), { data: { roomId: 'room-99' } }));
   });
   test('checkOut must be after checkIn', async () => {
-    await assertFails(setDoc(doc(guest(), 'bookings/bk1'),
-      booking({ checkIn: '2026-09-22', checkOut: '2026-09-20' })));
+    await assertFails(guestBooks(guest(), { data: { checkIn: '2026-09-22', checkOut: '2026-09-20' } }));
   });
   test('a guest may not impersonate another uid', async () => {
-    await assertFails(setDoc(doc(guest(), 'bookings/bk1'),
-      booking({ createdBy: 'someone-else' })));
+    await assertFails(guestBooks(guest(), { data: { createdBy: 'someone-else' } }));
   });
 
   test('reception may confirm but may not touch the money', async () => {
@@ -188,6 +200,66 @@ describe('bookings', () => {
     await seed('bookings/bk1', booking());
     await assertFails(deleteDoc(doc(reception(), 'bookings/bk1')));
     await assertFails(deleteDoc(doc(admin(), 'bookings/bk1')));
+  });
+});
+
+describe('how many rooms one visitor may hold', () => {
+  // A hold is free and takes a room off sale for two hours. Without a limit,
+  // one bored visitor empties the lodge for the afternoon in six clicks.
+  const startedHoursAgo = h => new Date(Date.now() - h * 3600000);
+
+  test('a booking that does not count itself is refused', async () => {
+    await assertFails(guestBooks(guest(), { counted: null }));
+  });
+
+  test('a fourth hold inside the same two hours is refused', async () => {
+    const started = startedHoursAgo(1);
+    await seed('webHolds/guest-abc', { count: 3, windowStart: started });
+    await assertFails(guestBooks(guest(), { counted: { count: 4, windowStart: started } }));
+  });
+
+  test('the third is still allowed — the limit is three, not two', async () => {
+    const started = startedHoursAgo(1);
+    await seed('webHolds/guest-abc', { count: 2, windowStart: started });
+    await assertSucceeds(guestBooks(guest(), { counted: { count: 3, windowStart: started } }));
+  });
+
+  test('once the two hours have passed the count starts again', async () => {
+    await seed('webHolds/guest-abc', { count: 3, windowStart: startedHoursAgo(3) });
+    await assertSucceeds(guestBooks(guest()));
+  });
+
+  test('a guest cannot start a fresh window early to clear the count', async () => {
+    await seed('webHolds/guest-abc', { count: 3, windowStart: startedHoursAgo(1) });
+    await assertFails(guestBooks(guest()));
+  });
+
+  test('a guest cannot backdate the window to make it look spent', async () => {
+    await assertFails(guestBooks(guest(), { counted: counting({ windowStart: startedHoursAgo(3) }) }));
+  });
+
+  test('a guest cannot skip a number, or count down', async () => {
+    const started = startedHoursAgo(1);
+    await seed('webHolds/guest-abc', { count: 1, windowStart: started });
+    await assertFails(guestBooks(guest(), { counted: { count: 1, windowStart: started } }));
+    await assertFails(guestBooks(guest(), { counted: { count: 0, windowStart: started } }));
+    await assertSucceeds(guestBooks(guest(), { counted: { count: 2, windowStart: started } }));
+  });
+
+  test('a guest cannot put their hold on someone else’s count', async () => {
+    await assertFails(guestBooks(guest(), { uid: 'guest-xyz' }));
+  });
+
+  test('the count is the visitor’s own business, and cannot be deleted', async () => {
+    await seed('webHolds/guest-abc', { count: 1, windowStart: startedHoursAgo(1) });
+    await assertSucceeds(getDoc(doc(guest(), 'webHolds/guest-abc')));
+    await assertFails(getDoc(doc(other(), 'webHolds/guest-abc')));
+    await assertFails(deleteDoc(doc(guest(), 'webHolds/guest-abc')));
+  });
+
+  test('the desk is not limited — a walk-in is a guest standing there', async () => {
+    await assertSucceeds(setDoc(doc(reception(), 'bookings/walk1'),
+      booking({ source: 'walkin', status: 'confirmed', createdBy: 'rec-1', holdExpiresAt: null })));
   });
 });
 

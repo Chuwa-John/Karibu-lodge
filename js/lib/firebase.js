@@ -13,8 +13,12 @@ import {
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
 } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 
-import { FIREBASE_CONFIG, USE_EMULATOR, EMULATOR_PORTS, IS_CONFIGURED } from './env.js';
+import {
+  FIREBASE_CONFIG, USE_EMULATOR, EMULATOR_PORTS, IS_CONFIGURED,
+  APP_CHECK_SITE_KEY, shouldUseAppCheck,
+} from './env.js';
 
 let app, db, auth;
 
@@ -27,6 +31,16 @@ export function initFirebase() {
   }
 
   app  = getApps()[0] || initializeApp(FIREBASE_CONFIG);
+
+  // Set up before the first database request, or that request goes out without
+  // a token and is refused once enforcement is switched on.
+  if (shouldUseAppCheck({ useEmulator: USE_EMULATOR, siteKey: APP_CHECK_SITE_KEY })) {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY),
+      isTokenAutoRefreshEnabled: true,
+    });
+  }
+
   db   = getFirestore(app);
   auth = getAuth(app);
 

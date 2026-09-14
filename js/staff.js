@@ -10,11 +10,12 @@ import { initFirebase, signInStaff, signOutStaff, watchStaffAuth } from './lib/f
 import {
   loadRooms, blockedFromCells, freeRooms, bookingReference,
   confirmBooking, cancelBooking, checkInGuest, checkOutGuest,
-  sweepExpiredHolds, createBooking,
+  sweepExpiredHolds, createBooking, extendHold, EXTENSION_MINUTES,
   RoomUnavailableError,
 } from './lib/availability.js';
 import { today, addDays, dateRange, fmtDate, countNights } from './lib/dates.js';
-import { askText } from './lib/ask.js';
+import { askText, askConfirm } from './lib/ask.js';
+import { explainError } from './lib/errors.js';
 import { createAlertTracker, SOON_MINUTES } from './lib/alerts.js';
 import { createChime } from './lib/chime.js';
 import { mountAdmin, unmountAdmin } from './admin-ui.js';
@@ -125,6 +126,9 @@ function render() {
     .sort((a, b) => (a.checkIn < b.checkIn ? -1 : 1));
   renderList('#list-pending', pending.map(b => bookingRow(b, [
     { act: 'confirm', label: 'Confirm', cls: 'btn-ok' },
+    // The two hours are the rule; this is the exception, for the guest who
+    // phones to say they are on their way.
+    { act: 'extend',  label: 'Hold longer', cls: 'btn-outline' },
     { act: 'cancel',  label: 'Decline', cls: 'btn-danger' },
   ])), 'Nothing waiting. New web bookings appear here the moment they arrive.');
   setCount('#count-pending', pending.length, true);
@@ -220,7 +224,7 @@ async function withButton(btn, fn) {
   try {
     await fn();
   } catch (err) {
-    setError('#console-error', err.message || String(err));
+    setError('#console-error', explainError(err));
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = label; }
   }
@@ -230,6 +234,19 @@ const ACTIONS = {
   confirm:  id => confirmBooking(state.db, id, state.user.uid),
   checkin:  id => checkInGuest(state.db, id, state.user.uid),
   checkout: id => checkOutGuest(state.db, id, state.user.uid),
+  extend: async id => {
+    const b = state.bookings.find(x => x.id === id);
+    const hours = EXTENSION_MINUTES / 60;
+    const who   = b ? b.guestName : 'This guest';
+    const room  = b ? ` Room ${b.roomNumber}` : ' the room';
+    const ok = await askConfirm(
+      `${who} keeps${room} for ${hours} more hours from now, and nobody else can book it ` +
+      'in that time. The exception is kept on the record in your name.',
+      { title: 'Hold the room longer?',
+        okLabel: `Hold ${hours} more hours`, cancelLabel: 'Leave it' });
+    if (!ok) return;
+    return extendHold(state.db, id, EXTENSION_MINUTES, state.user.uid);
+  },
   cancel: async id => {
     const b = state.bookings.find(x => x.id === id);
     const reason = await askText(
@@ -344,7 +361,7 @@ $('#walkin-form').addEventListener('submit', async e => {
     } catch (err) {
       const msg = err instanceof RoomUnavailableError
         ? `That room was taken while you were typing (${err.takenDates.join(', ')}). Pick another.`
-        : err.message;
+        : explainError(err);
       setError('#walkin-error', msg);
       refreshWalkinRooms();   // the modal shows the problem; the console banner stays quiet
     }

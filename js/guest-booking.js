@@ -12,7 +12,7 @@
 import { initFirebase, signInGuest } from './lib/firebase.js';
 import {
   loadRooms, fetchAvailability, isRoomFree, createBooking, bookingReference,
-  RoomUnavailableError, BookingError,
+  RoomUnavailableError, BookingError, HoldLimitError,
 } from './lib/availability.js';
 import { today, addDays, countNights, fmtDate, MAX_NIGHTS } from './lib/dates.js';
 import { ROOM_TYPES } from './lib/rooms.js';
@@ -53,6 +53,7 @@ function withTimeout(promise, ms, what) {
  */
 function outcomeOf(err) {
   if (err instanceof RoomUnavailableError) return 'taken';
+  if (err instanceof HoldLimitError) return 'limit';
   if (err instanceof BookingError) return 'refused';
   if (err?.code === 'permission-denied' || err?.code === 'invalid-argument') return 'refused';
   return 'unknown';
@@ -279,6 +280,16 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
       `Check-in: ${fmtDate(ci)}\nCheck-out: ${fmtDate(co)}\n` +
       `Nights: ${nights}\nTotal: ${money(room.rate * nights)} TSH`;
 
+    // Checked before anything is attempted, so this message can honestly say
+    // the room has NOT been reserved: nothing has been sent.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      showError('You seem to be offline, so your room has not been reserved. ' +
+        'Check your connection and try again, or book with us on WhatsApp.',
+        { label: '💬 Book on WhatsApp',
+          href: waUrl(`Hello Karibu Lodge, I would like to book:\n${details}`) });
+      return;
+    }
+
     setBusy(true);
     let phase = 'connecting';
     try {
@@ -300,6 +311,12 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
         showError(`Sorry — Room ${room.number} was just booked by someone else ` +
           `(${err.takenDates.map(fmtDate).join(', ')}). Please pick another room.`);
         await refresh();
+      } else if (outcome === 'limit') {
+        showError(`You have already held ${err.max} rooms in the last couple of hours, ` +
+          'so this one has not been reserved. If you need more rooms than that, ' +
+          'message us on WhatsApp and reception will arrange it for you.',
+          { label: '💬 Message reception',
+            href: waUrl(`Hello Karibu Lodge, I need more than ${err.max} rooms:\n${details}`) });
       } else if (outcome === 'refused') {
         showError('Your room has not been reserved — we could not complete the booking. ' +
           'Please try again, or book with us on WhatsApp.',

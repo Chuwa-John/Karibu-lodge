@@ -9,6 +9,7 @@ import { loadRooms } from './lib/availability.js';
 import { summarize, monthSpan } from './lib/reports.js';
 import { AUDIT_LABELS } from './lib/audit.js';
 import { askConfirm } from './lib/ask.js';
+import { explainError } from './lib/errors.js';
 import { today, fmtDate } from './lib/dates.js';
 
 const TABS = ['desk', 'reports', 'rooms', 'staff', 'audit'];
@@ -121,7 +122,7 @@ async function renderReport() {
   } catch (err) {
     if (mine !== tokens.report) return;
     $('#rep-kpis').innerHTML = '';
-    setNotice('#rep-error', `Could not load the report: ${err.message}`);
+    setNotice('#rep-error', `Could not load the report. ${explainError(err)}`);
   }
 }
 
@@ -272,7 +273,7 @@ async function onRoomSave(e) {
     btn.disabled = false;
     btn.textContent = 'Save';
     setNotice('#rooms-notice', err.code === 'permission-denied'
-      ? 'Only the owner can change rooms.' : `${name}: ${err.message}`);
+      ? 'Only the owner can change rooms.' : `${name}: ${explainError(err)}`);
   }
 }
 
@@ -327,6 +328,6 @@ async function renderAudit() {
     if (mine !== tokens.audit) return;
     table.innerHTML = '';
     setNotice('#audit-error', err.code === 'permission-denied'
-      ? 'Only the owner can read the record.' : `Could not load the record: ${err.message}`);
+      ? 'Only the owner can read the record.' : `Could not load the record. ${explainError(err)}`);
   }
 }

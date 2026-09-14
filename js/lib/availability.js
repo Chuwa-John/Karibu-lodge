@@ -26,6 +26,14 @@ import { auditEntry, describeBooking } from './audit.js';
 /** How long a web booking holds a room before reception has to act on it. */
 export const HOLD_MINUTES = 120;
 
+/** How many rooms one visitor may take off sale from the website, and over
+ *  what stretch of time. A hold costs the guest nothing, so without this one
+ *  visitor could hold all six rooms and empty the lodge for the afternoon.
+ *  Reception is not limited: a walk-in at the desk is a real guest standing
+ *  there. See firestore.rules — the same numbers are enforced server-side. */
+export const MAX_WEB_HOLDS = 3;
+export const HOLD_WINDOW_MINUTES = 120;
+
 /** Statuses that mean the booking still has a claim on its nights. */
 export const LIVE_STATUSES = ['pending', 'confirmed', 'checked_in'];
 
@@ -42,6 +50,15 @@ export class BookingError extends Error {
   constructor(message) {
     super(message);
     this.name = 'BookingError';
+  }
+}
+
+export class HoldLimitError extends Error {
+  constructor(max = MAX_WEB_HOLDS, windowMinutes = HOLD_WINDOW_MINUTES) {
+    super(`only ${max} rooms may be held from one device every ${windowMinutes} minutes`);
+    this.name = 'HoldLimitError';
+    this.max = max;
+    this.windowMinutes = windowMinutes;
   }
 }
 
@@ -124,6 +141,29 @@ export function freeRooms(rooms, blocked, checkIn, checkOut) {
   return rooms.filter(r => r.active !== false && isRoomFree(blocked, r.id, checkIn, checkOut));
 }
 
+/* ── The hold allowance ───────────────────────────────────────── */
+
+/**
+ * What webHolds/{uid} should say once this hold is counted, given what it says
+ * now. Throws HoldLimitError when this visitor has had their share of the
+ * current window.
+ *
+ * A counter that has run out of time starts again from 1 rather than being
+ * cleared by anything scheduled — the same trick as a lapsed hold: nothing has
+ * to run for the allowance to come back.
+ */
+export function nextAllowance(snap, nowMs = Date.now()) {
+  const prev = snap?.exists?.() ? snap.data() : null;
+  const startedMs = prev ? toMillis(prev.windowStart) : null;
+  const windowOpen = startedMs != null
+    && Number.isInteger(prev.count)
+    && startedMs > nowMs - HOLD_WINDOW_MINUTES * 60_000;
+
+  if (!windowOpen) return { windowStart: serverTimestamp(), count: 1 };
+  if (prev.count >= MAX_WEB_HOLDS) throw new HoldLimitError();
+  return { windowStart: prev.windowStart, count: prev.count + 1 };
+}
+
 /* ── The booking transaction ──────────────────────────────────── */
 
 /**
@@ -168,6 +208,10 @@ export async function createBooking(db, input) {
   const bookingRef = doc(collection(db, 'bookings'));
   const cellRefs   = nights.map(d => doc(db, 'nights', nightKey(roomId, d)));
 
+  // Only a hold placed from the website counts against the limit. A walk-in is
+  // a guest at the desk, and reception is trusted with the rooms anyway.
+  const allowanceRef = source === 'web' && !bornConfirmed ? doc(db, 'webHolds', uid) : null;
+
   const booking = {
     roomId,
     roomNumber: room.number,
@@ -188,6 +232,7 @@ export async function createBooking(db, input) {
   await runTransaction(db, async tx => {
     // Every read must happen before every write, so gather all cells first.
     const snaps = await Promise.all(cellRefs.map(ref => tx.get(ref)));
+    const allowanceSnap = allowanceRef ? await tx.get(allowanceRef) : null;
 
     const nowMs = Date.now();
     const taken = [];
@@ -196,7 +241,11 @@ export async function createBooking(db, input) {
     });
     if (taken.length) throw new RoomUnavailableError(roomId, taken);
 
+    // Throws before anything is written, so a refused visitor leaves no trace.
+    const allowance = allowanceRef ? nextAllowance(allowanceSnap, nowMs) : null;
+
     tx.set(bookingRef, booking);
+    if (allowanceRef) tx.set(allowanceRef, allowance);
     cellRefs.forEach((ref, i) => tx.set(ref, bornConfirmed
       ? {
           roomId, date: nights[i], bookingId: bookingRef.id,
@@ -306,6 +355,67 @@ export async function confirmBooking(db, bookingId, staffUid) {
     }));
 
     return { id: bookingId, ...b, status: 'confirmed' };
+  });
+}
+
+/** How much longer reception's exception holds a room, unless they say otherwise. */
+export const EXTENSION_MINUTES = 120;
+
+/** The longest a single exception may run, so a slip of the finger cannot take
+ *  a room off sale for a week. Reception can always extend again. */
+export const MAX_EXTENSION_MINUTES = 24 * 60;
+
+/**
+ * Reception makes an exception to the two hours: a guest who has phoned to say
+ * they are on their way keeps the room.
+ *
+ * The booking and every night it still holds move together in one transaction,
+ * so the ledger and the booking can never disagree about when the hold runs
+ * out — and the extension goes on the record with the name of whoever granted
+ * it. The new expiry runs from now, not from the old one: "hold it two more
+ * hours" means two hours from the moment it is asked for.
+ */
+export async function extendHold(db, bookingId, minutes = EXTENSION_MINUTES, staffUid) {
+  const mins = Number(minutes);
+  if (!Number.isFinite(mins) || mins < 1 || mins > MAX_EXTENSION_MINUTES) {
+    throw new BookingError(`an extension must be between 1 minute and ${MAX_EXTENSION_MINUTES / 60} hours`);
+  }
+
+  return runTransaction(db, async tx => {
+    const bRef  = doc(db, 'bookings', bookingId);
+    const bSnap = await tx.get(bRef);
+    if (!bSnap.exists()) throw new BookingError(`no such booking ${bookingId}`);
+
+    const b = bSnap.data();
+    // A confirmed booking has no expiry to extend, and a cancelled one has no
+    // room. Only a hold that is still waiting can be held longer.
+    if (b.status !== 'pending') throw new BookingError(`booking is ${b.status}, only a hold can be extended`);
+
+    const nights   = nightsBetween(b.checkIn, b.checkOut);
+    const cellRefs = nights.map(d => doc(db, 'nights', nightKey(b.roomId, d)));
+    const snaps    = await Promise.all(cellRefs.map(ref => tx.get(ref)));
+
+    // If this hold already lapsed and someone else took a night, there is
+    // nothing left to extend: promising it would double-book the room.
+    const lost = [];
+    snaps.forEach((s, i) => {
+      if (!s.exists() || s.data().bookingId !== bookingId) lost.push(nights[i]);
+    });
+    if (lost.length) throw new RoomUnavailableError(b.roomId, lost);
+
+    const until = Timestamp.fromMillis(Date.now() + mins * 60_000);
+
+    tx.update(bRef, { holdExpiresAt: until, updatedAt: serverTimestamp(), updatedBy: staffUid });
+    cellRefs.forEach((ref, i) => tx.set(ref, { ...snaps[i].data(), holdExpiresAt: until }));
+
+    tx.set(doc(collection(db, 'audit')), auditEntry(staffUid, 'extend_hold', {
+      bookingId, roomId: b.roomId,
+      summary: `${describeBooking(b)} · held ${mins} minutes longer by the desk`,
+      before: { holdExpiresAt: b.holdExpiresAt ?? null },
+      after:  { holdExpiresAt: until },
+    }));
+
+    return { id: bookingId, ...b, holdExpiresAt: until.toDate() };
   });
 }
 

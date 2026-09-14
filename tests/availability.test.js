@@ -11,10 +11,10 @@ import { readFileSync } from 'node:fs';
 
 import {
   createBooking, confirmBooking, cancelBooking, sweepExpiredHolds,
-  checkInGuest, checkOutGuest,
+  checkInGuest, checkOutGuest, extendHold, MAX_EXTENSION_MINUTES,
   fetchAvailability, isRoomFree, freeRooms, loadRooms, cellBlocks, blockedFromCells,
-  bookingReference,
-  RoomUnavailableError,
+  bookingReference, nextAllowance,
+  RoomUnavailableError, HoldLimitError, MAX_WEB_HOLDS,
 } from '../js/lib/availability.js';
 import { addDays, today, nightsBetween, nightKey } from '../js/lib/dates.js';
 
@@ -234,6 +234,77 @@ describe('concurrency', () => {
   });
 });
 
+describe('how much one visitor may hold', () => {
+  // Holding is free and takes a room out of the window for two hours, so the
+  // website limits it. The desk does not need limiting: a walk-in is a person
+  // standing at the counter.
+  const threeRooms = async (db, uid) => {
+    await createBooking(db, bookingInput({ uid, roomId: 'room-1' }));
+    await createBooking(db, bookingInput({ uid, roomId: 'room-2' }));
+    await createBooking(db, bookingInput({ uid, roomId: 'room-4' }));
+  };
+
+  test(`${MAX_WEB_HOLDS} rooms is fine, and the next one is refused without a trace`, async () => {
+    await threeRooms(guestA(), 'guest-a');
+
+    await assert.rejects(
+      // a room that is genuinely free, on nights nobody has claimed
+      () => createBooking(guestA(), bookingInput({ roomId: 'room-1', checkIn: D3, checkOut: D4 })),
+      HoldLimitError);
+
+    await env.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      assert.equal((await getDocs(collection(db, 'bookings'))).size, 3, 'the fourth was not written');
+      assert.equal((await getDocs(collection(db, 'nights'))).size, 6, 'and it claimed no nights');
+      assert.equal((await getDoc(doc(db, 'webHolds/guest-a'))).data().count, MAX_WEB_HOLDS);
+    });
+  });
+
+  test('the limit is per visitor, not per lodge', async () => {
+    await threeRooms(guestA(), 'guest-a');
+    const b = await createBooking(guestB(), bookingInput({ uid: 'guest-b', roomId: 'room-1', checkIn: D3, checkOut: D4 }));
+    assert.equal(b.status, 'pending');
+  });
+
+  test('the desk can take as many walk-ins as there are rooms', async () => {
+    const walkIn = over => createBooking(staff(), bookingInput({
+      uid: 'rec-1', source: 'walkin', status: 'confirmed', ...over }));
+    await walkIn({ roomId: 'room-1' });
+    await walkIn({ roomId: 'room-2' });
+    await walkIn({ roomId: 'room-4' });
+    const fourth = await walkIn({ roomId: 'room-1', checkIn: D3, checkOut: D4 });
+    assert.equal(fourth.status, 'confirmed');
+  });
+
+  test('the count starts again once the two hours have passed', async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), 'webHolds/guest-a'),
+        { count: MAX_WEB_HOLDS, windowStart: Timestamp.fromMillis(Date.now() - 3 * 3600_000) });
+    });
+
+    const b = await createBooking(guestA(), bookingInput());
+    assert.equal(b.status, 'pending');
+    await env.withSecurityRulesDisabled(async ctx => {
+      assert.equal((await getDoc(doc(ctx.firestore(), 'webHolds/guest-a'))).data().count, 1);
+    });
+  });
+
+  test('nextAllowance: counts up inside the window, starts again outside it', () => {
+    const snap = data => ({ exists: () => data != null, data: () => data });
+    const now = Date.now();
+    const fresh = t => ({ toMillis: () => t });
+
+    assert.equal(nextAllowance(snap(null), now).count, 1, 'the first hold ever');
+    assert.equal(nextAllowance(snap({ count: 1, windowStart: fresh(now - 60_000) }), now).count, 2);
+    assert.equal(nextAllowance(snap({ count: MAX_WEB_HOLDS, windowStart: fresh(now - 3 * 3600_000) }), now).count, 1,
+      'the old window has run out');
+    assert.throws(() => nextAllowance(snap({ count: MAX_WEB_HOLDS, windowStart: fresh(now - 60_000) }), now),
+      HoldLimitError);
+    // A counter nobody can make sense of must not be a way through.
+    assert.equal(nextAllowance(snap({ count: 'lots', windowStart: fresh(now) }), now).count, 1);
+  });
+});
+
 describe('holds and expiry', () => {
   test('a live hold blocks', async () => {
     await createBooking(guestA(), bookingInput());
@@ -348,6 +419,99 @@ describe('lifecycle', () => {
       assert.equal(cells.size, 2, 'only the live booking keeps its nights');
       cells.forEach(c => assert.equal(c.data().bookingId, live.id));
     });
+  });
+});
+
+describe('the desk makes an exception to the two hours', () => {
+  // Two hours is the rule for a web hold. Reception may hold a room longer for
+  // a guest who has phoned to say they are on their way — nobody else can.
+  const recordOf = async () => {
+    let entries = [];
+    await env.withSecurityRulesDisabled(async ctx => {
+      const snap = await getDocs(collection(ctx.firestore(), 'audit'));
+      entries = snap.docs.map(d => d.data());
+    });
+    return entries;
+  };
+
+  test('the booking and every night it holds move together', async () => {
+    const b = await createBooking(guestA(), bookingInput({ holdMinutes: 5 }));
+    const out = await extendHold(staff(), b.id, 180, 'rec-1');
+    assert.ok(out.holdExpiresAt.getTime() > Date.now() + 170 * 60_000);
+
+    await env.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      const booking = await getDoc(doc(db, `bookings/${b.id}`));
+      for (const d of [D1, D2]) {
+        const cell = await getDoc(doc(db, `nights/room-4_${d}`));
+        assert.equal(cell.data().holdExpiresAt.toMillis(), booking.data().holdExpiresAt.toMillis(),
+          `${d}: the ledger and the booking must agree when the hold runs out`);
+        assert.equal(cell.data().status, 'held');
+        assert.equal(cell.data().bookingId, b.id);
+      }
+    });
+  });
+
+  test('the room really is still held after the original two hours would have lapsed', async () => {
+    const b = await createBooking(guestA(), bookingInput({ holdMinutes: 5 }));
+    await extendHold(staff(), b.id, 180, 'rec-1');
+
+    const wellPastTheOriginal = Date.now() + 60 * 60_000;
+    const blocked = await fetchAvailability(anon(), D1, D4, wellPastTheOriginal);
+    assert.equal(isRoomFree(blocked, 'room-4', D1, D3), false);
+    await assert.rejects(
+      () => createBooking(guestB(), bookingInput({ uid: 'guest-b' })),
+      RoomUnavailableError);
+  });
+
+  test('the exception is on the record, in the name of whoever granted it', async () => {
+    const b = await createBooking(guestA(), bookingInput());
+    await extendHold(staff(), b.id, 120, 'rec-1');
+
+    const entry = (await recordOf()).find(e => e.action === 'extend_hold');
+    assert.ok(entry, 'an extension must be recorded');
+    assert.equal(entry.actor, 'rec-1');
+    assert.equal(entry.bookingId, b.id);
+    assert.match(entry.summary, /Amina Hassan · Room 4/);
+    assert.match(entry.summary, /120 minutes longer/);
+    assert.ok(entry.after.holdExpiresAt, 'the new expiry is recorded');
+  });
+
+  test('only a hold can be extended — a confirmed stay has no expiry to move', async () => {
+    const b = await createBooking(guestA(), bookingInput());
+    await confirmBooking(staff(), b.id, 'rec-1');
+    await assert.rejects(() => extendHold(staff(), b.id, 120, 'rec-1'), /only a hold can be extended/);
+  });
+
+  test('a silly length is refused before anything moves', async () => {
+    const b = await createBooking(guestA(), bookingInput());
+    // withSecurityRulesDisabled resolves undefined, so read out through a
+    // binding rather than its return value.
+    let was;
+    await env.withSecurityRulesDisabled(async ctx => {
+      was = (await getDoc(doc(ctx.firestore(), `bookings/${b.id}`))).data().holdExpiresAt.toMillis();
+    });
+
+    for (const mins of [0, -60, MAX_EXTENSION_MINUTES + 1, 'soon', null]) {
+      await assert.rejects(() => extendHold(staff(), b.id, mins, 'rec-1'), /between 1 minute/);
+    }
+
+    await env.withSecurityRulesDisabled(async ctx => {
+      const still = (await getDoc(doc(ctx.firestore(), `bookings/${b.id}`))).data().holdExpiresAt.toMillis();
+      assert.equal(still, was, 'the hold was left exactly as it was');
+      assert.deepEqual((await getDocs(collection(ctx.firestore(), 'audit'))).docs.map(d => d.data().action), []);
+    });
+  });
+
+  test('a hold whose nights were already taken cannot be extended', async () => {
+    const lapsed = await seedLapsedBooking();
+    await createBooking(guestB(), bookingInput({ uid: 'guest-b' }));   // took the nights
+    await assert.rejects(() => extendHold(staff(), lapsed.id, 120, 'rec-1'), RoomUnavailableError);
+  });
+
+  test('a guest cannot extend their own hold', async () => {
+    const b = await createBooking(guestA(), bookingInput());
+    await assert.rejects(() => extendHold(guestA(), b.id, 120, 'guest-a'));
   });
 });
 

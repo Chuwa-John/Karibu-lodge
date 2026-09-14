@@ -9,3 +9,6 @@ serviceAccount*.json
 *-service-account.json
 .env
 .env.*
+
+# Vercel build output (scripts/build-site.js)
+dist/

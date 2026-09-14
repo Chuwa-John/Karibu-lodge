@@ -34,6 +34,18 @@ const LIVE_CONFIG = {
   appId:             'REPLACE_ME',
 };
 
+/** Firebase App Check (reCAPTCHA Enterprise). Leave empty until a site key
+ *  exists for the live domain. With a key, every request from the site carries
+ *  proof it came from this web page, so a script calling the database directly
+ *  can be refused. Turn ENFORCEMENT on in the Firebase console only after its
+ *  App Check dashboard shows the site's requests arriving verified: enforcing
+ *  first would lock out the real site too. Never used against the emulator. */
+export const APP_CHECK_SITE_KEY = '';
+
+export function shouldUseAppCheck({ useEmulator, siteKey }) {
+  return !useEmulator && String(siteKey || '').trim() !== '';
+}
+
 export const FIREBASE_CONFIG = USE_EMULATOR ? EMULATOR_CONFIG : LIVE_CONFIG;
 
 export const IS_CONFIGURED =

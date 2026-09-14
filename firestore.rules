@@ -32,6 +32,38 @@ service cloud.firestore {
           && t < request.time + duration.value(125, 'm');
     }
 
+    /* ── How much one visitor may take off sale ───────────────
+       A hold costs the guest nothing and takes a room out of the window for
+       two hours, so one visitor could close the lodge for an afternoon with
+       six clicks. webHolds/{uid} counts the holds made in a rolling two-hour
+       window, and a booking is only allowed alongside the write that counts
+       it — so the count cannot be skipped. Cancelling does not hand one back
+       on purpose: this limits how often rooms are taken off sale, not how
+       many are live.                                                       */
+
+    function maxWebHolds() { return 3; }
+
+    // The visitor's browser decides "my window has run out" by its own clock,
+    // so a fresh window is accepted five minutes early — the same tolerance
+    // isValidHold() gives. Erring the other way would refuse honest guests.
+    function allowanceMoves(existed, before, after) {
+      return after.keys().hasOnly(['windowStart', 'count'])
+          && after.count is int
+          && after.windowStart is timestamp
+          && (
+               // the first hold, or the first of a new window
+               (after.count == 1
+                 && after.windowStart == request.time
+                 && (!existed || before.windowStart < request.time - duration.value(115, 'm')))
+               ||
+               // one more inside the window already running
+               (existed
+                 && after.windowStart == before.windowStart
+                 && after.count == before.count + 1
+                 && after.count <= maxWebHolds())
+             );
+    }
+
     /* ── Rooms: public catalogue, owner-managed ───────────── */
 
     match /rooms/{roomId} {
@@ -87,10 +119,31 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
+    /* ── How many rooms one visitor has held lately ───────── */
+
+    match /webHolds/{uid} {
+      allow read:   if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid
+                    && allowanceMoves(false, request.resource.data, request.resource.data);
+      allow update: if signedIn() && request.auth.uid == uid
+                    && allowanceMoves(true, resource.data, request.resource.data);
+      allow delete: if false;      // deleting it would be a way to reset the count
+    }
+
     /* ── Bookings: everything with a guest on it ──────────── */
 
     match /bookings/{bookingId} {
       allow read: if isStaff();
+
+      // The booking and the count against the limit are written together, or
+      // neither is written: getAfter() reads what this same commit leaves
+      // behind, and fails the rule outright if the count is not in it.
+      function countedAgainstTheLimit() {
+        let ref = /databases/$(database)/documents/webHolds/$(request.auth.uid);
+        return exists(ref)
+          ? allowanceMoves(true,  get(ref).data,      getAfter(ref).data)
+          : allowanceMoves(false, getAfter(ref).data, getAfter(ref).data);
+      }
 
       function guestBooking() {
         let d = request.resource.data;
@@ -107,7 +160,8 @@ service cloud.firestore {
             && room.active == true
             && d.ratePerNight == room.rate
             && d.total == d.ratePerNight * d.nights
-            && isValidHold(d.holdExpiresAt);
+            && isValidHold(d.holdExpiresAt)
+            && countedAgainstTheLimit();
       }
 
       // Reception moves a booking through its lifecycle but never touches money.
@@ -147,7 +201,7 @@ service cloud.firestore {
             && d.actor == request.auth.uid
             && d.at == request.time
             && d.action in ['walk_in', 'confirm', 'cancel', 'check_in',
-                            'check_out', 'expire', 'room_update']
+                            'check_out', 'expire', 'room_update', 'extend_hold']
             && d.summary is string && d.summary.size() <= 300
             && (!('before' in d) || d.before is map)
             && (!('after' in d) || d.after is map);
