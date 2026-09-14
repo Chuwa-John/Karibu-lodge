@@ -10,7 +10,7 @@ import { initFirebase, signInStaff, signOutStaff, watchStaffAuth } from './lib/f
 import {
   loadRooms, blockedFromCells, freeRooms, bookingReference,
   confirmBooking, cancelBooking, checkInGuest, checkOutGuest,
-  sweepExpiredHolds, createBooking, extendHold, EXTENSION_MINUTES,
+  sweepExpiredHolds, createBooking, extendHold, EXTENSION_MINUTES, rejectPayment,
   RoomUnavailableError,
 } from './lib/availability.js';
 import { today, addDays, dateRange, fmtDate, countNights } from './lib/dates.js';
@@ -79,6 +79,39 @@ function expiryLabel(b) {
   return `<span class="expiry">${Math.floor(mins / 60)}h ${mins % 60}m left</span>`;
 }
 
+/** What the guest says about paying. The reference is shown because that is
+ *  what the desk matches against the message on their own phone. */
+function paymentLabel(b) {
+  const p = b.payment;
+  if (!p) return '';
+  if (p.status === 'claimed') {
+    return `<span class="sep">·</span><span class="paid-claim">💰 says paid · ${esc(p.reference)} · ${money(p.amount)}</span>`;
+  }
+  if (p.status === 'received')  return `<span class="sep">·</span><span class="paid-yes">paid · ${esc(p.reference)}</span>`;
+  if (p.status === 'not_found') return `<span class="sep">·</span><span class="paid-no">payment not found</span>`;
+  return '';
+}
+
+/** A guest who says they have paid is a different job from an ordinary
+ *  request: the desk checks their phone and answers yes or no, and plain
+ *  Confirm would leave the money off the record. */
+function pendingActions(b) {
+  if (b.payment?.status === 'claimed') {
+    return [
+      { act: 'paid',   label: '✅ Payment received', cls: 'btn-ok' },
+      { act: 'nopay',  label: 'Not in my phone', cls: 'btn-danger' },
+      { act: 'extend', label: 'Hold longer', cls: 'btn-outline' },
+    ];
+  }
+  return [
+    { act: 'confirm', label: 'Confirm', cls: 'btn-ok' },
+    // The two hours are the rule; this is the exception, for the guest who
+    // phones to say they are on their way.
+    { act: 'extend',  label: 'Hold longer', cls: 'btn-outline' },
+    { act: 'cancel',  label: 'Decline', cls: 'btn-danger' },
+  ];
+}
+
 function bookingRow(b, actions) {
   const src = b.source === 'walkin' ? `<span class="tag tag-walkin">walk-in</span>` : '';
   return `
@@ -92,6 +125,7 @@ function bookingRow(b, actions) {
           ${fmtDate(b.checkIn)} → ${fmtDate(b.checkOut)}<span class="sep">·</span>
           ${b.nights} night${b.nights === 1 ? '' : 's'}<span class="sep">·</span>
           ${money(b.total)}
+          ${paymentLabel(b)}
           ${expiryLabel(b) ? `<span class="sep">·</span>${expiryLabel(b)}` : ''}
         </div>
       </div>
@@ -124,13 +158,8 @@ function render() {
 
   const pending = bs.filter(b => b.status === 'pending')
     .sort((a, b) => (a.checkIn < b.checkIn ? -1 : 1));
-  renderList('#list-pending', pending.map(b => bookingRow(b, [
-    { act: 'confirm', label: 'Confirm', cls: 'btn-ok' },
-    // The two hours are the rule; this is the exception, for the guest who
-    // phones to say they are on their way.
-    { act: 'extend',  label: 'Hold longer', cls: 'btn-outline' },
-    { act: 'cancel',  label: 'Decline', cls: 'btn-danger' },
-  ])), 'Nothing waiting. New web bookings appear here the moment they arrive.');
+  renderList('#list-pending', pending.map(b => bookingRow(b, pendingActions(b))),
+    'Nothing waiting. New web bookings appear here the moment they arrive.');
   setCount('#count-pending', pending.length, true);
 
   const arrivals = bs.filter(b => b.checkIn === t && b.status === 'confirmed');
@@ -234,6 +263,29 @@ const ACTIONS = {
   confirm:  id => confirmBooking(state.db, id, state.user.uid),
   checkin:  id => checkInGuest(state.db, id, state.user.uid),
   checkout: id => checkOutGuest(state.db, id, state.user.uid),
+  paid: async id => {
+    const b = state.bookings.find(x => x.id === id);
+    const p = b?.payment || {};
+    const ok = await askConfirm(
+      `Say yes only if ${money(p.amount ?? b?.total ?? 0)} is actually in the till on your phone, ` +
+      `reference ${p.reference || '—'}, from ${b ? b.guestName : 'this guest'}. ` +
+      `Room ${b?.roomNumber ?? ''} is then theirs with no time limit.`,
+      { title: 'Is the money in your phone?',
+        okLabel: 'Yes, payment received', cancelLabel: 'Let me check' });
+    if (!ok) return;
+    return confirmBooking(state.db, id, state.user.uid, { paymentReceived: true });
+  },
+  nopay: async id => {
+    const b = state.bookings.find(x => x.id === id);
+    const reason = await askText(
+      `${b ? b.guestName : 'This guest'} says they paid, reference ${b?.payment?.reference || '—'}. ` +
+      'Saying it is not there leaves the booking waiting on its ordinary two-hour hold, so they can ' +
+      'still pay or correct the reference. The note is kept on the record.',
+      { title: 'Payment not in your phone?', label: 'What did you see?', required: true, danger: true,
+        okLabel: 'Not received', cancelLabel: 'Back' });
+    if (reason === null) return;
+    return rejectPayment(state.db, id, reason.trim(), state.user.uid);
+  },
   extend: async id => {
     const b = state.bookings.find(x => x.id === id);
     const hours = EXTENSION_MINUTES / 60;
@@ -437,9 +489,15 @@ const BASE_TITLE       = document.title;
 
 function onBookingsChanged() {
   if (!state.alerts) return;
-  const { arrivals, lapsingSoon } = state.alerts.update(
+  const { arrivals, lapsingSoon, paymentClaims } = state.alerts.update(
     state.bookings, Date.now(), { fromCache: state.bookingsFromCache });
-  if (arrivals.length) {
+  // Money first, and in its own voice: somebody has sent real money and is
+  // sitting waiting to be told it arrived. Only counted as delivered if the
+  // bell actually rang, so a claim raised while sound was blocked is kept.
+  if (paymentClaims.length) {
+    if (state.chime.play('payment')) state.alerts.markPaymentHeard(paymentClaims);
+    restartRingTimer();
+  } else if (arrivals.length) {
     state.chime.play('arrival');
     restartRingTimer();
   } else {
@@ -459,9 +517,11 @@ function warnIfLapsing(lapsingSoon) {
  *  the moment a click turns sound on, so nothing that happened meanwhile is lost. */
 function ringOutstanding() {
   if (!state.alerts) return;
-  const { lapsingSoon } = state.alerts.update(
+  const { lapsingSoon, paymentClaims } = state.alerts.update(
     state.bookings, Date.now(), { fromCache: state.bookingsFromCache });
-  if (state.alerts.waiting.length) state.chime.play('arrival');
+  if (paymentClaims.length) {
+    if (state.chime.play('payment')) state.alerts.markPaymentHeard(paymentClaims);
+  } else if (state.alerts.waiting.length) state.chime.play('arrival');
   else warnIfLapsing(lapsingSoon);
   renderAlerts();
 }

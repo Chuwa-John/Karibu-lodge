@@ -271,6 +271,110 @@ export async function createBooking(db, input) {
   };
 }
 
+/* ── Paying before arrival ────────────────────────────────────────
+   The two hours exist so a room is not held all day for someone who never
+   turns up. A guest who has actually paid should not be held to that, so
+   there is one way out: pay the lodge's till on your own phone, tell the
+   system you have paid and quote the reference from the message, and
+   reception checks their own phone and decides.
+
+   Nothing here talks to a bank. A claim is a claim — it never confirms a
+   booking, never writes money onto one, and never holds a room outright.
+   Only reception's confirmation does that. What a claim DOES do is restart
+   the hold, so a guest who really has paid does not lose the room while
+   somebody is looking at their phone. A guest could keep claiming to keep
+   restarting it, but every claim rings the desk loudly, so that is noisy
+   rather than silent — and reception can decline the booking outright.   */
+
+export class PaymentClaimError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'PaymentClaimError';
+  }
+}
+
+/** The guest says they have paid. Restarts the hold; confirms nothing. */
+export async function claimPayment(db, bookingId, details, uid, holdMinutes = HOLD_MINUTES) {
+  const { reference, payerName = '', payerPhone = '' } = details || {};
+  const ref = String(reference ?? '').trim().toUpperCase();
+  if (ref.length < 4 || ref.length > 40) {
+    throw new PaymentClaimError('the reference from your payment message is needed');
+  }
+  const name  = String(payerName ?? '').trim().slice(0, 100);
+  const phone = String(payerPhone ?? '').replace(/[\s()-]/g, '').slice(0, 20);
+  if (!uid) throw new PaymentClaimError('a signed-in uid is required');
+
+  return runTransaction(db, async tx => {
+    const bRef  = doc(db, 'bookings', bookingId);
+    const bSnap = await tx.get(bRef);
+    if (!bSnap.exists()) throw new PaymentClaimError(`no such booking ${bookingId}`);
+
+    const b = bSnap.data();
+    if (b.createdBy !== uid)    throw new PaymentClaimError('that booking was made on another device');
+    if (b.status !== 'pending') throw new PaymentClaimError(`booking is already ${b.status}`);
+
+    const nights   = nightsBetween(b.checkIn, b.checkOut);
+    const cellRefs = nights.map(d => doc(db, 'nights', nightKey(b.roomId, d)));
+    const snaps    = await Promise.all(cellRefs.map(r => tx.get(r)));
+
+    // If the hold lapsed and the room has gone, say so now rather than take a
+    // payment claim for a room the guest cannot have.
+    const lost = [];
+    snaps.forEach((s, i) => {
+      if (!s.exists() || s.data().bookingId !== bookingId) lost.push(nights[i]);
+    });
+    if (lost.length) throw new RoomUnavailableError(b.roomId, lost);
+
+    const until = Timestamp.fromMillis(Date.now() + holdMinutes * 60_000);
+
+    tx.update(bRef, {
+      holdExpiresAt: until,
+      payment: {
+        status: 'claimed',
+        reference: ref,
+        payerName: name,
+        payerPhone: phone,
+        amount: b.total,              // always the full stay; never a figure the guest picked
+        claimedAt: serverTimestamp(),
+      },
+    });
+    // The ledger has to move with it, or the room goes back on sale while
+    // reception is still checking the phone.
+    cellRefs.forEach((r, i) => tx.set(r, { ...snaps[i].data(), holdExpiresAt: until }));
+
+    return { id: bookingId, reference: ref, amount: b.total };
+  });
+}
+
+/**
+ * Reception looked at their phone and the money is not there. The booking
+ * stays pending and its hold keeps running: the guest can pay, or correct the
+ * reference and claim again, or lose the room the ordinary way.
+ */
+export async function rejectPayment(db, bookingId, reason, staffUid) {
+  return runTransaction(db, async tx => {
+    const bRef  = doc(db, 'bookings', bookingId);
+    const bSnap = await tx.get(bRef);
+    if (!bSnap.exists()) throw new BookingError(`no such booking ${bookingId}`);
+
+    const b = bSnap.data();
+    if (b.payment?.status !== 'claimed') throw new BookingError('there is no payment waiting to be checked');
+
+    tx.update(bRef, {
+      payment: { ...b.payment, status: 'not_found', note: String(reason || '').slice(0, 300), reviewedBy: staffUid },
+      updatedAt: serverTimestamp(),
+      updatedBy: staffUid,
+    });
+    tx.set(doc(collection(db, 'audit')), auditEntry(staffUid, 'payment_rejected', {
+      bookingId, roomId: b.roomId,
+      summary: `${describeBooking(b)} · ref ${b.payment.reference} not found · ${reason || '(no note)'}`,
+      before: { payment: 'claimed' }, after: { payment: 'not_found' },
+    }));
+
+    return { id: bookingId, ...b, payment: { ...b.payment, status: 'not_found' } };
+  });
+}
+
 /* ── Front-desk status moves ──────────────────────────────────── */
 
 const STATUS_ACTION = { checked_in: 'check_in', checked_out: 'check_out' };
@@ -312,7 +416,7 @@ export function checkOutGuest(db, bookingId, staffUid) {
  * stamped onto each night — cells only ever carry money a human approved,
  * which is what makes revenue-by-date trustworthy.
  */
-export async function confirmBooking(db, bookingId, staffUid) {
+export async function confirmBooking(db, bookingId, staffUid, { paymentReceived = false } = {}) {
   return runTransaction(db, async tx => {
     const bRef  = doc(db, 'bookings', bookingId);
     const bSnap = await tx.get(bRef);
@@ -333,11 +437,21 @@ export async function confirmBooking(db, bookingId, staffUid) {
     });
     if (lost.length) throw new RoomUnavailableError(b.roomId, lost);
 
+    // Confirming on the back of a payment is the same act — the room stops
+    // being a hold and becomes theirs — so it goes through here rather than
+    // down a second path that could drift out of step with this one.
+    if (paymentReceived && b.payment?.status !== 'claimed') {
+      throw new BookingError('there is no payment waiting to be checked');
+    }
+
     tx.update(bRef, {
       status: 'confirmed',
       holdExpiresAt: null,
       updatedAt: serverTimestamp(),
       updatedBy: staffUid,
+      ...(paymentReceived
+        ? { payment: { ...b.payment, status: 'received', reviewedBy: staffUid } }
+        : {}),
     });
 
     cellRefs.forEach((ref, i) => tx.set(ref, {
@@ -349,10 +463,17 @@ export async function confirmBooking(db, bookingId, staffUid) {
       rate: b.ratePerNight,
     }));
 
-    tx.set(doc(collection(db, 'audit')), auditEntry(staffUid, 'confirm', {
-      bookingId, roomId: b.roomId, summary: describeBooking(b),
-      before: { status: b.status }, after: { status: 'confirmed' },
-    }));
+    tx.set(doc(collection(db, 'audit')), paymentReceived
+      ? auditEntry(staffUid, 'payment_confirmed', {
+          bookingId, roomId: b.roomId,
+          summary: `${describeBooking(b)} · paid, ref ${b.payment.reference}`,
+          before: { status: b.status, payment: 'claimed' },
+          after:  { status: 'confirmed', payment: 'received' },
+        })
+      : auditEntry(staffUid, 'confirm', {
+          bookingId, roomId: b.roomId, summary: describeBooking(b),
+          before: { status: b.status }, after: { status: 'confirmed' },
+        }));
 
     return { id: bookingId, ...b, status: 'confirmed' };
   });

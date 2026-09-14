@@ -30,6 +30,7 @@ export function createAlertTracker({ soonMinutes = SOON_MINUTES } = {}) {
   const seen    = new Set();   // pending web bookings already known about
   const waiting = new Map();   // id -> booking: announced, not yet dealt with
   const heard   = new Set();   // ids whose lapsing warning has actually played
+  const heardPaid = new Set(); // ids whose payment claim has actually been heard
 
   function update(bookings, nowMs = Date.now(), { fromCache = false } = {}) {
     // The baseline — "what was already waiting" — must come from the server.
@@ -38,7 +39,7 @@ export function createAlertTracker({ soonMinutes = SOON_MINUTES } = {}) {
     // everything booked in the meantime look new. Measured 2026-09-11: first
     // snapshot fromCache with 14 bookings, then the server's with 15. Until the
     // server has been heard, a cached list is ignored entirely.
-    if (!primed && fromCache) return { arrivals: [], lapsingSoon: [], waiting: [] };
+    if (!primed && fromCache) return { arrivals: [], lapsingSoon: [], paymentClaims: [], waiting: [] };
 
     // Only live web requests matter. A lapsed hold has nothing left to say: the
     // room is already back on sale, and "Clear lapsed" tidies the row.
@@ -76,7 +77,16 @@ export function createAlertTracker({ soonMinutes = SOON_MINUTES } = {}) {
       if (expiry - nowMs <= soonMinutes * 60_000) lapsingSoon.push(b);
     }
 
-    return { arrivals, lapsingSoon, waiting: [...waiting.values()] };
+    // Somebody says they have paid and is waiting to hear back. Owed until it
+    // has actually been heard, for the same reason a lapsing warning is: this
+    // one has money behind it, and a silent bell must not use it up.
+    const paymentClaims = [];
+    for (const [id, b] of live) {
+      if (b.payment?.status !== 'claimed' || heardPaid.has(id)) continue;
+      paymentClaims.push(b);
+    }
+
+    return { arrivals, lapsingSoon, paymentClaims, waiting: [...waiting.values()] };
   }
 
   /** "Got it". With an id, just that booking; without, everything waiting. */
@@ -91,10 +101,16 @@ export function createAlertTracker({ soonMinutes = SOON_MINUTES } = {}) {
     for (const b of bookingsOrIds) heard.add(typeof b === 'string' ? b : b.id);
   }
 
+  /** The console calls this only after the payment bell really rang. */
+  function markPaymentHeard(bookingsOrIds) {
+    for (const b of bookingsOrIds) heardPaid.add(typeof b === 'string' ? b : b.id);
+  }
+
   return {
     update,
     acknowledge,
     markHeard,
+    markPaymentHeard,
     get waiting() { return [...waiting.values()]; },
     isWaiting: id => waiting.has(id),
   };

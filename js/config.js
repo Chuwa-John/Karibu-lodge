@@ -18,6 +18,19 @@ export const CONFIG = {
   //        live booking off at once, without touching any other code.
   liveBooking: true,
 
+  // ── Payment ────────────────────────────
+  // The mobile-money till a guest pays into to secure a room outright, instead
+  // of having to reach the lodge within the two-hour hold. There is NO payment
+  // gateway here and nothing on this site ever talks to a bank: the guest pays
+  // on their own phone, tells the system they have paid and quotes the message
+  // reference, reception checks their own phone, and only reception's
+  // confirmation holds the room. Until `number` is filled in, the site does not
+  // offer paying at all and the two-hour hold is the only way.
+  till: {
+    number: "REPLACE_ME",        // the Lipa/till number guests pay into
+    name:   "Karibu Lodge",      // the name that shows on the guest's phone
+  },
+
   // ── Google Maps ────────────────────────
   mapEmbedUrl: "https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d3962.8673972968845!2d39.17967717584115!3d-6.663350593331586!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zNsKwMzknNDguMSJTIDM5wrAxMCc1Ni4xIkU!5e0!3m2!1sen!2ske!4v1775203075201!5m2!1sen!2ske",
 

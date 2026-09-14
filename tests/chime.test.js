@@ -17,6 +17,7 @@ function fakeAudio({ allowResume = true, resumeNeverSettles = false, throwOnCrea
       this.destination = { speakers: true };
       this.onstatechange = null;
       this.oscillators = [];
+      this.gains = [];
       made.push(this);
     }
     resume() {
@@ -37,7 +38,17 @@ function fakeAudio({ allowResume = true, resumeNeverSettles = false, throwOnCrea
       return osc;
     }
     createGain() {
-      return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} };
+      // Loudness is part of the message, so the ramp targets are recorded.
+      const node = {
+        peaks: [],
+        gain: {
+          setValueAtTime() {},
+          exponentialRampToValueAtTime: v => { node.peaks.push(v); },
+        },
+        connect() {},
+      };
+      this.gains.push(node);
+      return node;
     }
   }
   return { FakeAudioContext, made };
@@ -86,6 +97,32 @@ describe('the bell', () => {
     assert.deepEqual(notes('test'), [880]);
     assert.ok(made[0].oscillators.every(o => o.startedAt >= made[0].currentTime),
       'never scheduled in the past, where it would be silently skipped');
+  });
+
+  test('the payment bell is its own tune, and louder than the rest', async () => {
+    // Reception must be able to tell, without looking up, that this one is
+    // about money somebody has already sent.
+    const { FakeAudioContext, made } = fakeAudio();
+    const chime = createChime({ AudioContextImpl: FakeAudioContext });
+    await chime.unlock();
+
+    const ring = kind => {
+      made[0].oscillators = [];
+      made[0].gains = [];
+      chime.play(kind);
+      return {
+        notes: made[0].oscillators.map(o => o.frequencyHz),
+        peak: Math.max(...made[0].gains.flatMap(g => g.peaks)),
+      };
+    };
+
+    const payment = ring('payment');
+    const arrival = ring('arrival');
+    const soon    = ring('soon');
+
+    assert.deepEqual(payment.notes, [988, 1319, 988, 1319], 'four rising tones, unlike any other alert');
+    assert.ok(payment.peak > arrival.peak && payment.peak > soon.peak,
+      `money must ring louder: payment ${payment.peak}, arrival ${arrival.peak}, soon ${soon.peak}`);
   });
 
   test('a browser that refuses to start audio leaves it blocked, and says so', async () => {

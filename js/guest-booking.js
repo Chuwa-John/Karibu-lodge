@@ -12,6 +12,7 @@
 import { initFirebase, signInGuest } from './lib/firebase.js';
 import {
   loadRooms, fetchAvailability, isRoomFree, createBooking, bookingReference,
+  claimPayment, PaymentClaimError,
   RoomUnavailableError, BookingError, HoldLimitError,
 } from './lib/availability.js';
 import { today, addDays, countNights, fmtDate, MAX_NIGHTS } from './lib/dates.js';
@@ -356,6 +357,7 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
         We will call or WhatsApp you on <strong>${esc(b.guestPhone)}</strong> to confirm.
         ${until ? `We are holding the room until <strong>${esc(until)}</strong>.` : ''}
       </p>
+      ${payBlock(b)}
       <div class="lb-done-actions">
         <a class="btn btn-whatsapp" target="_blank" rel="noopener" href="${esc(waUrl(message))}">💬 Message reception</a>
         <button type="button" class="btn btn-outline" data-lb="again">Make another booking</button>
@@ -364,7 +366,79 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
     el.pick.hidden = true;
     el.done.hidden = false;
     el.done.querySelector('[data-lb="again"]').onclick = reset;
+    wirePayment(b);
     el.done.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  /* ── Paying to keep the room ───────────────────────────────────
+     The hold runs out in two hours because a room cannot be kept all day for
+     someone who may never arrive. A guest who pays the till is not in that
+     position, so they can say so here. This only tells reception; reception
+     checks their own phone and decides. Nothing on this page takes money. */
+
+  const till = () => {
+    const t = CONFIG.till;
+    const number = String(t?.number ?? '').trim();
+    return number && !number.includes('REPLACE_ME') ? { ...t, number } : null;
+  };
+
+  function payBlock(b) {
+    const t = till();
+    if (!t) return '';                     // no till set up: the hold is the only way
+    return `
+      <div class="lb-pay" data-lb="pay">
+        <p class="lb-pay-lead">Arriving later than that?</p>
+        <p class="lb-small">Pay the full <strong>${money(b.total)} TSH</strong> to
+          <strong>${esc(t.name || 'our till')}</strong>, till <strong>${esc(t.number)}</strong>,
+          then tell us below. Reception checks the payment on their own phone and
+          keeps Room ${esc(b.roomNumber)} for you — no two-hour limit.</p>
+        <div class="form-group">
+          <label for="lb-payref">Reference from your payment message</label>
+          <input type="text" id="lb-payref" placeholder="e.g. QWE4RT56YU" autocomplete="off" />
+          <div class="error-msg" id="lb-payref-error"></div>
+        </div>
+        <button type="button" class="btn btn-primary" data-lb="paid">I have paid</button>
+      </div>`;
+  }
+
+  function wirePayment(b) {
+    const box = el.done.querySelector('[data-lb="pay"]');
+    if (!box) return;
+    const input = box.querySelector('#lb-payref');
+    const error = box.querySelector('#lb-payref-error');
+    const btn   = box.querySelector('[data-lb="paid"]');
+
+    btn.onclick = async () => {
+      const reference = input.value.trim();
+      error.textContent = '';
+      error.style.display = 'none';
+      if (reference.length < 4) {
+        error.textContent = 'Please copy the reference from the payment message on your phone.';
+        error.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      const label = btn.textContent;
+      btn.textContent = 'Telling reception…';
+      try {
+        await claimPayment(db, b.id, {
+          reference, payerName: b.guestName, payerPhone: b.guestPhone,
+        }, b.createdBy);
+        box.innerHTML =
+          `<p class="lb-pay-lead">Thank you — reception is checking your payment now.</p>
+           <p class="lb-small">They will call or WhatsApp you on <strong>${esc(b.guestPhone)}</strong>
+             once they see it. Room ${esc(b.roomNumber)} is being kept for you in the meantime.</p>`;
+      } catch (err) {
+        console.warn('[live booking] payment claim', err);
+        btn.disabled = false;
+        btn.textContent = label;
+        error.textContent = err instanceof PaymentClaimError || err instanceof RoomUnavailableError
+          ? err.message
+          : 'We could not pass that on just now. Please message reception on WhatsApp with your reference.';
+        error.style.display = 'block';
+      }
+    };
   }
 
   function reset() {

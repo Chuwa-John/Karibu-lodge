@@ -13,8 +13,8 @@ import {
   createBooking, confirmBooking, cancelBooking, sweepExpiredHolds,
   checkInGuest, checkOutGuest, extendHold, MAX_EXTENSION_MINUTES,
   fetchAvailability, isRoomFree, freeRooms, loadRooms, cellBlocks, blockedFromCells,
-  bookingReference, nextAllowance,
-  RoomUnavailableError, HoldLimitError, MAX_WEB_HOLDS,
+  bookingReference, nextAllowance, claimPayment, rejectPayment,
+  RoomUnavailableError, HoldLimitError, MAX_WEB_HOLDS, PaymentClaimError,
 } from '../js/lib/availability.js';
 import { addDays, today, nightsBetween, nightKey } from '../js/lib/dates.js';
 
@@ -419,6 +419,150 @@ describe('lifecycle', () => {
       assert.equal(cells.size, 2, 'only the live booking keeps its nights');
       cells.forEach(c => assert.equal(c.data().bookingId, live.id));
     });
+  });
+});
+
+describe('paying the till before arriving', () => {
+  // The two hours exist so a room is not kept all day for someone who never
+  // turns up. A guest who has actually sent money is not in that position —
+  // but only reception, looking at their own phone, can say the money is there.
+  const REF = 'QWE4RT56YU';
+
+  const record = async () => {
+    let entries = [];
+    await env.withSecurityRulesDisabled(async ctx => {
+      const snap = await getDocs(collection(ctx.firestore(), 'audit'));
+      entries = snap.docs.map(d => d.data());
+    });
+    return entries;
+  };
+  const readBooking = async id => {
+    let data;
+    await env.withSecurityRulesDisabled(async ctx => {
+      data = (await getDoc(doc(ctx.firestore(), `bookings/${id}`))).data();
+    });
+    return data;
+  };
+
+  test('a claim restarts the hold and keeps the nights — and confirms nothing', async () => {
+    const b = await createBooking(guestA(), bookingInput({ holdMinutes: 5 }));
+    const out = await claimPayment(guestA(), b.id,
+      { reference: 'qwe4rt56yu', payerName: 'Amina Hassan', payerPhone: '0712 345 678' }, 'guest-a');
+
+    assert.equal(out.reference, REF, 'stored as it will be read out at the desk');
+    assert.equal(out.amount, 60000, 'the full stay, taken from the booking');
+
+    const bk = await readBooking(b.id);
+    assert.equal(bk.status, 'pending', 'saying you paid does not confirm anything');
+    assert.equal(bk.payment.status, 'claimed');
+    assert.equal(bk.payment.amount, 60000);
+    assert.equal(bk.payment.payerPhone, '0712345678');
+    assert.ok(bk.holdExpiresAt.toMillis() > Date.now() + 60 * 60_000, 'the clock starts again');
+
+    await env.withSecurityRulesDisabled(async ctx => {
+      for (const d of [D1, D2]) {
+        const cell = await getDoc(doc(ctx.firestore(), `nights/room-4_${d}`));
+        assert.equal(cell.data().holdExpiresAt.toMillis(), bk.holdExpiresAt.toMillis(),
+          `${d}: the ledger must not put the room back on sale under a guest who has paid`);
+      }
+    });
+  });
+
+  test('the room stays held past the original two hours', async () => {
+    const b = await createBooking(guestA(), bookingInput({ holdMinutes: 5 }));
+    await claimPayment(guestA(), b.id, { reference: REF }, 'guest-a');
+
+    const blocked = await fetchAvailability(anon(), D1, D4, Date.now() + 30 * 60_000);
+    assert.equal(isRoomFree(blocked, 'room-4', D1, D3), false);
+    await assert.rejects(() => createBooking(guestB(), bookingInput({ uid: 'guest-b' })), RoomUnavailableError);
+  });
+
+  test('reception confirms it, the room becomes theirs outright, and the money is on the record', async () => {
+    const b = await createBooking(guestA(), bookingInput());
+    await claimPayment(guestA(), b.id, { reference: REF }, 'guest-a');
+    await confirmBooking(staff(), b.id, 'rec-1', { paymentReceived: true });
+
+    const bk = await readBooking(b.id);
+    assert.equal(bk.status, 'confirmed');
+    assert.equal(bk.holdExpiresAt, null, 'no time limit once it is paid for');
+    assert.equal(bk.payment.status, 'received');
+    assert.equal(bk.payment.reviewedBy, 'rec-1');
+
+    await env.withSecurityRulesDisabled(async ctx => {
+      const cell = await getDoc(doc(ctx.firestore(), `nights/room-4_${D1}`));
+      assert.equal(cell.data().status, 'confirmed');
+      assert.equal(cell.data().rate, 30000);
+    });
+
+    const entry = (await record()).find(e => e.action === 'payment_confirmed');
+    assert.ok(entry, 'a payment confirmation must be recorded as such, not as a plain confirm');
+    assert.equal(entry.actor, 'rec-1');
+    assert.match(entry.summary, new RegExp(REF));
+  });
+
+  test('reception says it is not there: still pending, still on its hold, and recorded', async () => {
+    const b = await createBooking(guestA(), bookingInput());
+    await claimPayment(guestA(), b.id, { reference: REF }, 'guest-a');
+    await rejectPayment(staff(), b.id, 'nothing from that number in the till', 'rec-1');
+
+    const bk = await readBooking(b.id);
+    assert.equal(bk.status, 'pending', 'the guest can still pay, or correct the reference');
+    assert.equal(bk.payment.status, 'not_found');
+    assert.match(bk.payment.note, /nothing from that number/);
+
+    const entry = (await record()).find(e => e.action === 'payment_rejected');
+    assert.ok(entry);
+    assert.match(entry.summary, /not found/);
+  });
+
+  test('confirming a payment nobody claimed is refused', async () => {
+    const b = await createBooking(guestA(), bookingInput());
+    await assert.rejects(
+      () => confirmBooking(staff(), b.id, 'rec-1', { paymentReceived: true }),
+      /no payment waiting/);
+    await assert.rejects(() => rejectPayment(staff(), b.id, 'nothing', 'rec-1'), /no payment waiting/);
+  });
+
+  test('a guest cannot claim payment on somebody else’s booking', async () => {
+    const b = await createBooking(guestA(), bookingInput());
+
+    // Refused twice over, and the outer refusal comes first: the rules will not
+    // let another guest so much as read this booking, so guest B is stopped
+    // before any of our own code runs.
+    await assert.rejects(() => claimPayment(guestB(), b.id, { reference: REF }, 'guest-b'),
+      err => {
+        assert.equal(err.code, 'permission-denied', `got: ${err.message}`);
+        return true;
+      });
+
+    // And if a read were ever allowed, the engine checks who made the booking.
+    await assert.rejects(
+      () => claimPayment(guestA(), b.id, { reference: REF }, 'somebody-else'),
+      /another device/);
+
+    assert.equal((await readBooking(b.id)).payment, undefined, 'nothing was written either way');
+  });
+
+  test('a reference that is not a reference is refused before anything is written', async () => {
+    const b = await createBooking(guestA(), bookingInput());
+    for (const reference of ['', 'ab', null, undefined]) {
+      await assert.rejects(() => claimPayment(guestA(), b.id, { reference }, 'guest-a'), PaymentClaimError);
+    }
+    assert.equal((await readBooking(b.id)).payment, undefined);
+  });
+
+  test('a claim on a room that has already gone to somebody else is refused', async () => {
+    const lapsed = await seedLapsedBooking({ uid: 'guest-a' });
+    await createBooking(guestB(), bookingInput({ uid: 'guest-b' }));
+    await assert.rejects(
+      () => claimPayment(guestA(), lapsed.id, { reference: REF }, 'guest-a'),
+      RoomUnavailableError);
+  });
+
+  test('a claim on a booking that is already confirmed or cancelled is refused', async () => {
+    const b = await createBooking(guestA(), bookingInput());
+    await confirmBooking(staff(), b.id, 'rec-1');
+    await assert.rejects(() => claimPayment(guestA(), b.id, { reference: REF }, 'guest-a'), /already confirmed/);
   });
 });
 

@@ -3,10 +3,17 @@
 // Which Firebase to talk to. Localhost talks to the emulator, everything else
 // talks to the real project.
 //
-// ── TO GO LIVE ──────────────────────────────────────────────────
-// Fill in LIVE_CONFIG below from the Firebase console:
-//   Project settings → General → Your apps → Web app → SDK setup → Config
-// Nothing else in the codebase needs to change.
+// ── LIVE PROJECT ────────────────────────────────────────────────
+// karibu-lodge-booking, created 2026-09-14. These values are not secret: they
+// ship inside the page and identify the project, nothing more. What keeps the
+// data safe is firestore.rules, and later App Check.
+//
+// Still to do in the Firebase console before the site can take a booking:
+//   1. Authentication → Sign-in method → Anonymous → Enable.
+//      Guests sign in anonymously to hold a room; without this every booking
+//      fails at the sign-in step.
+//   2. Firestore Database → Create database (this also switches the API on).
+// Then deploy the rules and indexes.
 
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
 
@@ -26,12 +33,12 @@ const EMULATOR_CONFIG = {
 };
 
 const LIVE_CONFIG = {
-  apiKey:            'REPLACE_ME',
-  authDomain:        'REPLACE_ME.firebaseapp.com',
-  projectId:         'REPLACE_ME',
-  storageBucket:     'REPLACE_ME.appspot.com',
-  messagingSenderId: 'REPLACE_ME',
-  appId:             'REPLACE_ME',
+  apiKey:            'AIzaSyC-_YbdE79uc97lWK5WI0RZRfWztoAB3zA',
+  authDomain:        'karibu-lodge-booking.firebaseapp.com',
+  projectId:         'karibu-lodge-booking',
+  storageBucket:     'karibu-lodge-booking.firebasestorage.app',
+  messagingSenderId: '23482327666',
+  appId:             '1:23482327666:web:f4d62329645af6cb8898eb',
 };
 
 /** Firebase App Check (reCAPTCHA Enterprise). Leave empty until a site key

@@ -17,7 +17,16 @@ const TUNES = {
   arrival: [[880, 0, 0.35], [660, 0.32, 0.6]],   // ding-dong
   soon:    [[587, 0, 0.4], [587, 0.5, 0.4]],     // two level beeps: something is running out
   test:    [[880, 0, 0.25]],
+  // Someone says they have paid. Four rising tones, longer than anything else
+  // and deliberately harder to mistake for an ordinary booking: this one has
+  // money behind it and a guest waiting to hear back.
+  payment: [[988, 0, 0.3], [1319, 0.28, 0.3], [988, 0.56, 0.3], [1319, 0.84, 0.55]],
 };
+
+/** Peak loudness per tune. Payment is the loudest on purpose — reception must
+ *  be able to tell, without looking, that this one is about money. */
+const PEAK = { payment: 0.95 };
+const DEFAULT_PEAK = 0.6;
 
 export function createChime({
   AudioContextImpl = globalThis.AudioContext || globalThis.webkitAudioContext,
@@ -75,6 +84,7 @@ export function createChime({
     if (state() !== 'running') return false;
     try {
       const t0 = ctx.currentTime + 0.02;
+      const peak = PEAK[kind] ?? DEFAULT_PEAK;
       for (const [freq, offset, length] of TUNES[kind] || TUNES.arrival) {
         const osc   = ctx.createOscillator();
         const gain  = ctx.createGain();
@@ -82,7 +92,7 @@ export function createChime({
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, start);
         gain.gain.setValueAtTime(0.0001, start);
-        gain.gain.exponentialRampToValueAtTime(0.6, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(peak, start + 0.02);
         gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
         osc.connect(gain);
         gain.connect(ctx.destination);

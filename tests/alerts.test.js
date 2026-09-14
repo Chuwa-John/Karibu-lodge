@@ -175,6 +175,45 @@ describe('holds about to lapse', () => {
   });
 });
 
+describe('somebody says they have paid', () => {
+  // A claim is money already sent, with a guest waiting to hear back, so it is
+  // raised whether or not the booking itself was ever announced as new.
+  const claim = (over = {}) => ({ status: 'claimed', reference: 'QWE4RT56YU', amount: 60000, ...over });
+  const paid  = (id, payment = claim(), over = {}) => web(id, { payment, ...over });
+
+  test('raised even when the booking was already sitting there', () => {
+    const t = createAlertTracker();
+    t.update([web('a')], NOW);                       // known, not new
+    assert.deepEqual(t.update([web('a')], at(1)).arrivals, []);
+    assert.deepEqual(ids(t.update([paid('a')], at(2)).paymentClaims), ['a']);
+  });
+
+  test('owed until the bell actually rang', () => {
+    const t = createAlertTracker();
+    assert.deepEqual(ids(t.update([paid('a')], NOW).paymentClaims), ['a']);
+    assert.deepEqual(ids(t.update([paid('a')], at(1)).paymentClaims), ['a'], 'sound was blocked: still owed');
+    t.markPaymentHeard(['a']);
+    assert.deepEqual(t.update([paid('a')], at(2)).paymentClaims, [], 'heard once, not every half minute');
+  });
+
+  test('once the desk has answered it, it stops', () => {
+    const t = createAlertTracker();
+    t.update([paid('a')], NOW);
+    assert.deepEqual(t.update([paid('a', claim({ status: 'received' }))], at(1)).paymentClaims, []);
+    assert.deepEqual(t.update([paid('b', claim({ status: 'not_found' }))], at(2)).paymentClaims, []);
+  });
+
+  test('an ordinary booking raises nothing about money', () => {
+    const t = createAlertTracker();
+    assert.deepEqual(t.update([web('a')], NOW).paymentClaims, []);
+  });
+
+  test('a claim on a hold that has already lapsed is not raised', () => {
+    const t = createAlertTracker();
+    assert.deepEqual(t.update([paid('a', claim(), { holdExpiresAt: hold(-1) })], NOW).paymentClaims, []);
+  });
+});
+
 describe('the baseline', () => {
   test('a list served from the local cache cannot set what counts as already waiting', () => {
     // Sign out and back in on the same page: Firestore first replays its stale
@@ -203,7 +242,7 @@ describe('the baseline', () => {
   test('a console that has only ever seen the cache announces nothing and warns about nothing', () => {
     const t = createAlertTracker();
     const r = t.update([web('a', { holdExpiresAt: hold(5) })], NOW, { fromCache: true });
-    assert.deepEqual(r, { arrivals: [], lapsingSoon: [], waiting: [] });
+    assert.deepEqual(r, { arrivals: [], lapsingSoon: [], paymentClaims: [], waiting: [] });
   });
 });
 

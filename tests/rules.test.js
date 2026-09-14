@@ -163,10 +163,13 @@ describe('bookings', () => {
     await assertSucceeds(guestBooks(guest()));
   });
 
-  test('a guest may not read bookings, those are other peoples phone numbers', async () => {
-    await seed('bookings/bk1', booking());
-    await assertFails(getDoc(doc(guest(), 'bookings/bk1')));
-    await assertFails(getDocs(collection(guest(), 'bookings')));
+  test('a guest reads their own booking and no other — those are other peoples phone numbers', async () => {
+    await seed('bookings/bk1', booking());                              // made by guest-abc
+    await seed('bookings/bk2', booking({ createdBy: 'guest-xyz' }));
+    await assertSucceeds(getDoc(doc(guest(), 'bookings/bk1')));
+    await assertFails(getDoc(doc(guest(), 'bookings/bk2')));
+    await assertFails(getDocs(collection(guest(), 'bookings')), 'and never the whole list');
+    await assertFails(getDocs(collection(anon(), 'bookings')));
     await assertSucceeds(getDoc(doc(reception(), 'bookings/bk1')));
   });
 
@@ -200,6 +203,70 @@ describe('bookings', () => {
     await seed('bookings/bk1', booking());
     await assertFails(deleteDoc(doc(reception(), 'bookings/bk1')));
     await assertFails(deleteDoc(doc(admin(), 'bookings/bk1')));
+  });
+});
+
+describe('a guest saying they have paid', () => {
+  // A guest may say it. Only reception, looking at their own phone, may act
+  // on it — so the rules must let the claim through and nothing else.
+  const claim = (over = {}) => ({
+    status: 'claimed', reference: 'QWE4RT56YU', payerName: 'Amina Hassan',
+    payerPhone: '0712345678', amount: 60000, claimedAt: serverTimestamp(), ...over,
+  });
+  const claims = (db, over = {}, extra = {}) =>
+    updateDoc(doc(db, 'bookings/bk1'), { payment: claim(over), holdExpiresAt: inHours(2), ...extra });
+
+  test('the guest who made the booking may say they have paid', async () => {
+    await seed('bookings/bk1', booking());
+    await assertSucceeds(claims(guest()));
+  });
+
+  test('somebody else may not say it for them', async () => {
+    await seed('bookings/bk1', booking());
+    await assertFails(claims(other()));
+    await assertFails(claims(anon()));
+  });
+
+  test('the claim must be for the full amount already on the booking', async () => {
+    await seed('bookings/bk1', booking());
+    await assertFails(claims(guest(), { amount: 1000 }));
+    await assertFails(claims(guest(), { amount: 60001 }));
+  });
+
+  test('saying you paid cannot confirm the booking or touch the money', async () => {
+    await seed('bookings/bk1', booking());
+    await assertFails(claims(guest(), {}, { status: 'confirmed' }));
+    await assertFails(claims(guest(), {}, { total: 1 }));
+    await assertFails(claims(guest(), {}, { ratePerNight: 1 }));
+  });
+
+  test('a guest cannot mark their own payment as received or invent a status', async () => {
+    await seed('bookings/bk1', booking());
+    await assertFails(claims(guest(), { status: 'received' }));
+    await assertFails(claims(guest(), { status: 'not_found' }));
+  });
+
+  test('a claim cannot be backdated, and cannot hold the room for a week', async () => {
+    await seed('bookings/bk1', booking());
+    await assertFails(claims(guest(), { claimedAt: new Date(Date.now() - 3600000) }));
+    await assertFails(updateDoc(doc(guest(), 'bookings/bk1'),
+      { payment: claim(), holdExpiresAt: inHours(24 * 7) }));
+  });
+
+  test('no smuggling extra fields in with the claim', async () => {
+    await seed('bookings/bk1', booking());
+    await assertFails(claims(guest(), { note: 'trust me' }));
+  });
+
+  test('a booking that is no longer pending cannot be claimed against', async () => {
+    await seed('bookings/bk1', booking({ status: 'confirmed' }));
+    await assertFails(claims(guest()));
+  });
+
+  test('reception records what they actually saw', async () => {
+    await seed('bookings/bk1', booking({ payment: { status: 'claimed', reference: 'QWE4RT56YU', amount: 60000 } }));
+    await assertSucceeds(updateDoc(doc(reception(), 'bookings/bk1'),
+      { payment: { status: 'not_found', reference: 'QWE4RT56YU', amount: 60000, note: 'not in the till' } }));
   });
 });
 

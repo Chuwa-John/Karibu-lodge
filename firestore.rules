@@ -114,8 +114,24 @@ service cloud.firestore {
             && resource.data.holdExpiresAt < request.time;
       }
 
+      // A guest who says they have paid keeps their nights while reception
+      // checks the phone — otherwise the room goes back on sale under someone
+      // who has already sent money. Only their OWN cells, only their own
+      // booking, and only in the same commit as the claim itself: claimedAt
+      // must be this request, so an old claim cannot be replayed to hold a
+      // room forever.
+      function payingGuestHold() {
+        let d = request.resource.data;
+        let b = getAfter(/databases/$(database)/documents/bookings/$(d.bookingId)).data;
+        return guestHold()
+            && resource.data.bookingId == d.bookingId
+            && b.createdBy == request.auth.uid
+            && b.payment.status == 'claimed'
+            && b.payment.claimedAt == request.time;
+      }
+
       allow create: if isStaff() || guestHold();
-      allow update: if isStaff() || (guestHold() && cellExpired());
+      allow update: if isStaff() || (guestHold() && cellExpired()) || payingGuestHold();
       allow delete: if isStaff();
     }
 
@@ -133,7 +149,13 @@ service cloud.firestore {
     /* ── Bookings: everything with a guest on it ──────────── */
 
     match /bookings/{bookingId} {
-      allow read: if isStaff();
+      // Staff see every booking. A guest sees only the one they made — their
+      // own name and phone, nobody else's. They need it: saying "I have paid"
+      // reads the booking first, to hang the claim on what it actually costs.
+      // A guest still cannot list the collection: a query that is not limited
+      // to their own bookings matches documents this refuses, so it fails.
+      allow read: if isStaff()
+                  || (signedIn() && resource.data.createdBy == request.auth.uid);
 
       // The booking and the count against the limit are written together, or
       // neither is written: getAfter() reads what this same commit leaves
@@ -168,13 +190,36 @@ service cloud.firestore {
       function receptionEdit() {
         return isStaff()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-                 'status', 'notes', 'roomId', 'roomNumber',
+                 'status', 'notes', 'roomId', 'roomNumber', 'payment',
                  'holdExpiresAt', 'cancelReason', 'updatedAt', 'updatedBy'
                ]);
       }
 
+      // A guest may say "I have paid" and nothing else. It cannot confirm the
+      // booking, cannot touch the money on it, and cannot name its own amount:
+      // the claim must be for the full total already on the booking. Only
+      // reception, checking their own phone, turns this into a confirmation.
+      function guestPaymentClaim() {
+        let d = request.resource.data;
+        let p = d.payment;
+        return signedIn()
+            && resource.data.createdBy == request.auth.uid
+            && resource.data.status == 'pending'
+            && d.status == 'pending'
+            && d.diff(resource.data).affectedKeys().hasOnly(['payment', 'holdExpiresAt'])
+            && p.keys().hasOnly(['status', 'reference', 'payerName', 'payerPhone', 'amount', 'claimedAt'])
+            && p.keys().hasAll(['status', 'reference', 'payerName', 'payerPhone', 'amount', 'claimedAt'])
+            && p.status == 'claimed'
+            && p.reference is string && p.reference.size() >= 4 && p.reference.size() <= 40
+            && p.payerName is string && p.payerName.size() <= 100
+            && p.payerPhone is string && p.payerPhone.size() <= 20
+            && p.amount == resource.data.total
+            && p.claimedAt == request.time
+            && isValidHold(d.holdExpiresAt);
+      }
+
       allow create: if isStaff() || guestBooking();
-      allow update: if receptionEdit() || isAdmin();
+      allow update: if receptionEdit() || isAdmin() || guestPaymentClaim();
       allow delete: if false;   // cancelled is a status, not an absence
     }
 
@@ -201,7 +246,8 @@ service cloud.firestore {
             && d.actor == request.auth.uid
             && d.at == request.time
             && d.action in ['walk_in', 'confirm', 'cancel', 'check_in',
-                            'check_out', 'expire', 'room_update', 'extend_hold']
+                            'check_out', 'expire', 'room_update', 'extend_hold',
+                            'payment_confirmed', 'payment_rejected']
             && d.summary is string && d.summary.size() <= 300
             && (!('before' in d) || d.before is map)
             && (!('after' in d) || d.after is map);
