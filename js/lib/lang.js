@@ -1,23 +1,24 @@
 // js/lib/lang.js
 //
-// Kiswahili for the money.
+// The strings this app writes itself, in English and Kiswahili.
 //
-// The site itself is translated by Google Translate (see the foot of
-// index.html): one copy of every string, translated in place. But Google only
-// ever sees the markup that was on the page when it ran. Anything this app
-// renders afterwards — the room list, the hold countdown, and the payment
-// card — stays in English however the switch is set. Measured 2026-09-15:
-// with the page in Swahili, the booking widget still read "Room 1 · 30,000
-// TSH / night" and "4 of 6 rooms free".
+// The site at large is translated by Google Translate (see the foot of
+// index.html): one copy of every string, translated in place, no language
+// control of our own. That is the right trade for a brochure. It is the wrong
+// trade for two things:
 //
-// That is tolerable for a room list and not tolerable for the payment step: a
-// guest is being asked to send real money to a till registered under somebody
-// else's name. Those few strings are therefore kept here in both languages,
-// chosen by the SAME Google switch, so there is still no language control of
-// our own to keep in step with it.
+//   1. Money. A guest is asked to send real shillings to a till registered in
+//      somebody else's name. Those words have to be exact.
+//   2. Availability. Measured 2026-09-15: Google rendered "4 of 6 rooms free"
+//      as "Vyumba 4 kati ya 6 BILA MALIPO" — four rooms at no charge. A lodge
+//      cannot have its booking page saying that.
 //
-// Deliberately small. Every string added here is a string that can drift from
-// its English twin, so this covers paying and nothing else.
+// So those few strings live here in both languages, chosen by the SAME Google
+// switch (it leaves a googtrans cookie behind), and the elements that show
+// them are marked translate="no" so Google does not translate our Swahili
+// into Swahili again.
+//
+// Deliberately small. Every string here is one that can drift from its twin.
 
 /** What the Google widget stores when someone picks a language: googtrans=/en/sw */
 export function chosenLanguage(cookie) {
@@ -28,6 +29,23 @@ export function chosenLanguage(cookie) {
 }
 
 const EN = {
+  /* ── What is free, and when ──────────────────────────────────── */
+  // "available", never "free": free also means costing nothing, and that is
+  // exactly the reading Google picked when this said free.
+  checking:    'Checking which rooms are available…',
+  roomsFree:   ({ free, total, stay }) => `${free} of ${total} rooms available for ${stay}.`,
+  allBooked:   ({ stay }) => `Every room is booked for ${stay}. Try other dates, or message us.`,
+  cannotCheck: 'We could not check availability just now.',
+  tryAgain:    'Try again',
+  nights:      ({ n }) => `${n} night${n === 1 ? '' : 's'}`,
+  // Shown in the same element, which Google is told to leave alone — so these
+  // have to be here too, or they would sit in English inside a Swahili page.
+  pickDates:     'Choose your check-in and check-out dates.',
+  pastCheckIn:   'Check-in cannot be in the past.',
+  checkOutAfter: 'Check-out must be after check-in.',
+  tooLong:       ({ max }) => `For stays longer than ${max} nights, please message us.`,
+
+  /* ── Paying the till ─────────────────────────────────────────── */
   payLead:      'Arriving later than that?',
   payHow:       ({ amount, provider, till, room }) =>
     `Pay the full ${amount} TSH${provider ? ` by ${provider}` : ''} to Lipa number ${till}, then tell us ` +
@@ -50,6 +68,18 @@ const EN = {
 };
 
 const SW = {
+  checking:    'Tunaangalia vyumba vilivyo wazi…',
+  roomsFree:   ({ free, total, stay }) => `Vyumba ${free} kati ya ${total} vipo wazi kwa ${stay}.`,
+  allBooked:   ({ stay }) =>
+    `Vyumba vyote vimechukuliwa kwa ${stay}. Jaribu tarehe nyingine, au wasiliana nasi.`,
+  cannotCheck: 'Hatukuweza kuangalia nafasi kwa sasa.',
+  tryAgain:    'Jaribu tena',
+  nights:      ({ n }) => `usiku ${n}`,
+  pickDates:     'Chagua tarehe ya kuingia na ya kutoka.',
+  pastCheckIn:   'Tarehe ya kuingia haiwezi kuwa iliyopita.',
+  checkOutAfter: 'Tarehe ya kutoka lazima iwe baada ya tarehe ya kuingia.',
+  tooLong:       ({ max }) => `Kwa kukaa zaidi ya usiku ${max}, tafadhali wasiliana nasi.`,
+
   payLead:      'Utafika baada ya saa mbili?',
   payHow:       ({ amount, provider, till, room }) =>
     `Lipa kiasi kamili cha TSH ${amount}${provider ? ` kwa ${provider}` : ''} kwenda Lipa namba ${till}, ` +
@@ -76,19 +106,14 @@ const SW = {
 const BOOKS = { en: EN, sw: SW };
 
 /**
- * The payment wording for a language. Missing keys fall back to English
- * rather than showing a blank: a half-empty payment instruction is worse than
- * one in the wrong language.
+ * The wording for a language. A key missing from a book falls back to English
+ * rather than coming back blank: a half-written payment instruction is worse
+ * than one in the wrong language.
  */
-export function payWords(lang = 'en') {
+export function words(lang = 'en') {
   const book = BOOKS[lang] || EN;
-  return new Proxy({}, {
-    get(_, key) {
-      const value = book[key] ?? EN[key];
-      return typeof value === 'function' ? value : value;
-    },
-  });
+  return new Proxy({}, { get: (_, key) => book[key] ?? EN[key] });
 }
 
-/** Every key the payment step needs, so a missing translation is a test failure. */
-export const PAY_KEYS = Object.keys(EN);
+/** Every key, so a translation missed here fails a test rather than a guest. */
+export const STRING_KEYS = Object.keys(EN);

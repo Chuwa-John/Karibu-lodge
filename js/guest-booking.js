@@ -17,7 +17,7 @@ import {
 } from './lib/availability.js';
 import { today, addDays, countNights, fmtDate, MAX_NIGHTS } from './lib/dates.js';
 import { ROOM_TYPES } from './lib/rooms.js';
-import { chosenLanguage, payWords } from './lib/lang.js';
+import { chosenLanguage, words } from './lib/lang.js';
 
 /** How long to wait on a read before telling the guest. Deliberately NOT
  *  applied to the booking write — see the submit handler. */
@@ -97,12 +97,13 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
   el.checkOut.value = addDays(t, 1);
 
   function datesProblem() {
+    const w = words(chosenLanguage());
     const ci = el.checkIn.value, co = el.checkOut.value;
-    if (!ci || !co)    return 'Choose your check-in and check-out dates.';
-    if (ci < today())  return 'Check-in cannot be in the past.';
-    if (co <= ci)      return 'Check-out must be after check-in.';
+    if (!ci || !co)    return w.pickDates;
+    if (ci < today())  return w.pastCheckIn;
+    if (co <= ci)      return w.checkOutAfter;
     try { countNights(ci, co); }
-    catch { return `For stays longer than ${MAX_NIGHTS} nights, please message us on WhatsApp.`; }
+    catch { return w.tooLong({ max: MAX_NIGHTS }); }
     return null;
   }
 
@@ -126,7 +127,7 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'lb-link';
-    btn.textContent = 'Try again';
+    btn.textContent = words(chosenLanguage()).tryAgain;
     btn.onclick = refresh;
     el.status.append(' ', btn);
   }
@@ -170,7 +171,11 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
     }
 
     const ci = el.checkIn.value, co = el.checkOut.value;
-    setStatus('Checking which rooms are free…');
+    // Our own words, in whichever language the Google switch is set to. This
+    // line is marked translate="no" in the markup, because Google read "rooms
+    // free" as "bila malipo" — rooms at no charge.
+    const w = words(chosenLanguage());
+    setStatus(w.checking);
     el.rooms.setAttribute('aria-busy', 'true');
     try {
       const blocked = await withTimeout(
@@ -178,15 +183,15 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
       if (mine !== state.token) return;
       state.blocked = blocked;
       const free = rooms.filter(r => isRoomFree(blocked, r.id, ci, co)).length;
-      const stay = `${plural(countNights(ci, co), 'night')}, ${fmtDate(ci)} → ${fmtDate(co)}`;
+      const stay = `${w.nights({ n: countNights(ci, co) })}, ${fmtDate(ci)} → ${fmtDate(co)}`;
       setStatus(free
-        ? `${free} of ${rooms.length} rooms free for ${stay}.`
-        : `Every room is booked for ${stay}. Try other dates, or message us on WhatsApp.`);
+        ? w.roomsFree({ free, total: rooms.length, stay })
+        : w.allBooked({ stay }));
     } catch (err) {
       if (mine !== state.token) return;
       console.warn('[live booking] availability', err);
       state.blocked = null;
-      setStatus('We could not check availability just now.', { retry: true });
+      setStatus(w.cannotCheck, { retry: true });
     } finally {
       if (mine === state.token) el.rooms.removeAttribute('aria-busy');
     }
@@ -404,7 +409,7 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
     if (!t) return '';                     // no till set up: the hold is the only way
 
     const lang = chosenLanguage();
-    const w    = payWords(lang);
+    const w    = words(lang);
     // When we have written the Swahili ourselves, Google must leave the card
     // alone — translating Swahili into Swahili mangles it.
     const leaveAlone = lang === 'sw' ? ' translate="no"' : '';
@@ -432,7 +437,7 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
     const box = el.done.querySelector('[data-lb="pay"]');
     if (!box) return;
     const lang  = chosenLanguage();
-    const w     = payWords(lang);
+    const w     = words(lang);
     const input = box.querySelector('#lb-payref');
     const error = box.querySelector('#lb-payref-error');
     const btn   = box.querySelector('[data-lb="paid"]');

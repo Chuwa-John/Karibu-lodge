@@ -470,7 +470,10 @@
                     <input type="date" id="lb-checkout" />
                   </div>
                 </div>
-                <div class="lb-status" id="lb-status" role="status" aria-live="polite"></div>
+                <!-- Written by us in both languages (js/lib/lang.js), so Google
+                     must leave it alone: it turned "rooms free" into "bila
+                     malipo" — rooms at no charge. -->
+                <div class="lb-status notranslate" translate="no" id="lb-status" role="status" aria-live="polite"></div>
                 <div class="lb-rooms" id="lb-rooms"></div>
                 <!-- Outside the form on purpose. When a room is lost to someone
                      else the selection clears and the form hides, and the message
