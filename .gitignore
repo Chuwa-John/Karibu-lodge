@@ -4,9 +4,12 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 
-# Never commit credentials
+# Never commit credentials.
+# The console downloads its keys as <project>-firebase-adminsdk-<id>-<n>.json,
+# which none of the obvious patterns catch — hence the third line.
 serviceAccount*.json
 *-service-account.json
+*firebase-adminsdk*.json
 .env
 .env.*
 

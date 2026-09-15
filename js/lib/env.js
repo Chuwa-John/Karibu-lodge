@@ -4,9 +4,11 @@
 // talks to the real project.
 //
 // ── LIVE PROJECT ────────────────────────────────────────────────
-// karibu-lodge-booking, created 2026-09-14. These values are not secret: they
-// ship inside the page and identify the project, nothing more. What keeps the
-// data safe is firestore.rules, and later App Check.
+// karibu-lodge-booking-7744e, created 2026-09-15 from the Firebase console
+// (the console adds that suffix because the plain name was already taken).
+// These values are not secret: they ship inside the page and identify the
+// project, nothing more. What keeps the data safe is firestore.rules, and
+// later App Check.
 //
 // Still to do in the Firebase console before the site can take a booking:
 //   1. Authentication → Sign-in method → Anonymous → Enable.
@@ -33,12 +35,12 @@ const EMULATOR_CONFIG = {
 };
 
 const LIVE_CONFIG = {
-  apiKey:            'AIzaSyC-_YbdE79uc97lWK5WI0RZRfWztoAB3zA',
-  authDomain:        'karibu-lodge-booking.firebaseapp.com',
-  projectId:         'karibu-lodge-booking',
-  storageBucket:     'karibu-lodge-booking.firebasestorage.app',
-  messagingSenderId: '23482327666',
-  appId:             '1:23482327666:web:f4d62329645af6cb8898eb',
+  apiKey:            'AIzaSyBYktlZNP3ttALWinRvqVeRLQKpxCjPU8k',
+  authDomain:        'karibu-lodge-booking-7744e.firebaseapp.com',
+  projectId:         'karibu-lodge-booking-7744e',
+  storageBucket:     'karibu-lodge-booking-7744e.firebasestorage.app',
+  messagingSenderId: '222208812072',
+  appId:             '1:222208812072:web:a7bc05c0c053a61423011d',
 };
 
 /** Firebase App Check (reCAPTCHA Enterprise). Leave empty until a site key
