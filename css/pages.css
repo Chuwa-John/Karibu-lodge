@@ -99,4 +99,37 @@
 .lb-next { font-size: 0.85rem; color: var(--earth-light); line-height: 1.7; margin-bottom: 1.25rem; }
 .lb-done-actions { display: flex; gap: 0.7rem; justify-content: center; flex-wrap: wrap; }
 .lb-done-actions .btn { font-size: 0.82rem; padding: 0.7rem 1.4rem; }
+
+/* Paying to keep the room. Deliberately its own card rather than a third
+   button in the row below: it cannot be pressed until the reference has been
+   typed into the box immediately above it, so the two belong together. Without
+   this the block inherited .lb-done centring and the default .btn metrics,
+   which left it a different size and out of line with the row underneath. */
+.lb-pay { text-align: left; margin: 1.5rem 0 1.25rem; padding: 1rem 1.1rem; background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: var(--radius); }
+.lb-pay-lead { font-size: 0.9rem; font-weight: 600; color: var(--bark); margin-bottom: 0.3rem; }
+.lb-pay .lb-small { margin-top: 0; line-height: 1.7; }
+.lb-pay .form-group { margin: 0.9rem 0 0.8rem; }
+.lb-pay label { display: block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--earth-light); margin-bottom: 0.35rem; }
+.lb-pay input { width: 100%; }
+.lb-pay .btn { display: block; width: 100%; font-size: 0.82rem; padding: 0.7rem 1.4rem; }
+/* The till is registered to somebody else's name. Said plainly, and not in
+   the same grey as the rest, because a guest who is not warned will think
+   they are being defrauded. */
+.lb-pay-name { font-size: 0.78rem; line-height: 1.6; color: var(--bark); background: rgba(201,168,76,0.14); border-left: 3px solid var(--gold); border-radius: 6px; padding: 0.55rem 0.7rem; margin-top: 0.6rem; }
+.lb-pay-call { margin-top: 0.85rem; text-align: center; }
+
+/* ── Kiswahili / English (Google Translate) ───────────────────────
+   Google rewrites the page's text in place, which is why there are no second
+   copies of any string here. Anything that must survive word for word — a
+   till number, a booking reference, a phone number, the name the till is
+   registered to — carries translate="no" in the markup that builds it.
+   The widget also injects a banner that shoves the whole page down; the last
+   two rules put it back where it belongs. */
+.gt-switch { display: flex; align-items: center; }
+.gt-switch .goog-te-gadget { font-size: 0; color: transparent; line-height: 1; }
+.gt-switch .goog-te-gadget > span { display: none; }
+.gt-switch select.goog-te-combo { margin: 0; padding: 0.35rem 0.55rem; font-family: 'Jost', sans-serif; font-size: 0.78rem; color: var(--bark); background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 999px; cursor: pointer; }
+.gt-switch select.goog-te-combo:hover { border-color: var(--gold); }
+body { top: 0 !important; }
+.skiptranslate iframe { display: none !important; }
 @media (max-width: 400px) { .lb-rooms { grid-template-columns: 1fr; } }

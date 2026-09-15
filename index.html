@@ -34,6 +34,16 @@
 </head>
 <body>
 
+  <!-- Always-on booking. Worth saying plainly at the top of every page: a
+       guest looking for a room at 11pm assumes they have to wait until
+       morning, and books somewhere else instead. -->
+  <div class="topbar">
+    <div class="container">
+      <span>🕐</span> <strong>Booking open 24/7</strong>
+      <span class="topbar-sub">— reserve a room online at any hour, day or night</span>
+    </div>
+  </div>
+
   <!-- =============================================
        NAVBAR
   ============================================== -->
@@ -60,6 +70,9 @@
         <li><a href="#" data-page="contact">Contact</a></li>
       </ul>
       <a href="#" class="btn btn-primary nav-cta" data-page="booking">Book Now</a>
+      <!-- Kiswahili / English. Filled in by Google Translate at the foot of
+           this file; empty and invisible if that never loads. -->
+      <div id="gt-switch" class="gt-switch notranslate" translate="no"></div>
       <button class="hamburger" id="hamburger" aria-label="Open menu">
         <span></span><span></span><span></span>
       </button>
@@ -631,6 +644,34 @@
 
   
   
+  <!-- Kiswahili / English, by Google Translate.
+       Deliberately NOT a language switch of our own: that would mean a second
+       copy of every string on the site, and the day they drift apart is the
+       day a guest reads the wrong price. Google translates the page in place,
+       so there is only ever one copy to keep true.
+       Anything that must survive word for word — the till number, a booking
+       reference, a phone number, the name the till is registered to — is
+       marked translate="no" where it is built, in js/guest-booking.js.
+       Guest pages only: the reception console is left in English, because a
+       half-translated console is worse than an English one for the two people
+       who use it every day.
+       If this script is blocked or ever goes away, the switcher is simply not
+       there and the site carries on in English. -->
+  <script>
+    window.googleTranslateElementInit = function () {
+      new google.translate.TranslateElement({
+        pageLanguage: 'en',
+        includedLanguages: 'en,sw',
+        // HORIZONTAL renders a real <select>, which styles cleanly and works
+        // like any other dropdown on a phone. SIMPLE draws a custom gadget
+        // that cannot be styled to match the site.
+        layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL,
+        autoDisplay: false,
+      }, 'gt-switch');
+    };
+  </script>
+  <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async></script>
+
   <script type="module" src="js/main.js"></script>
 
 </body>

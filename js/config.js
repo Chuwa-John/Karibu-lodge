@@ -27,9 +27,19 @@ export const CONFIG = {
   // confirmation holds the room. Until `number` is filled in, the site does not
   // offer paying at all and the two-hour hold is the only way.
   till: {
-    number: "REPLACE_ME",        // the Lipa/till number guests pay into
-    name:   "Karibu Lodge",      // the name that shows on the guest's phone
+    number:   "353231650",         // Vodacom M-Pesa Lipa number guests pay into
+    provider: "M-Pesa (Vodacom)",  // so the guest knows which menu to use
+
+    // What the guest's OWN phone shows when they confirm the payment. It is
+    // not the lodge's name, so the page says so before they pay: a stranger
+    // being asked for 20,000 TSH to a name they do not recognise will stop,
+    // and they are right to.
+    name: "Leonia Paschal Matingo Store 2",
   },
+
+  // The desk. There is NO WhatsApp on this line, so anything that tells a
+  // guest to get in touch after paying must say call, never message.
+  receptionPhone: "0761393333",
 
   // ── Google Maps ────────────────────────
   mapEmbedUrl: "https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d3962.8673972968845!2d39.17967717584115!3d-6.663350593331586!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zNsKwMzknNDguMSJTIDM5wrAxMCc1Ni4xIkU!5e0!3m2!1sen!2ske!4v1775203075201!5m2!1sen!2ske",

@@ -1,6 +1,20 @@
+/* 24/7 banner.
+   Fixed above the navbar, which is fixed too — so the navbar is offset by
+   exactly this bar's height, from one variable, or the two overlap the moment
+   either changes. Slim on purpose: it states a fact, it is not an advert. */
+:root { --topbar-h: 34px; }
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 998;
+  height: var(--topbar-h); display: flex; align-items: center;
+  background: var(--bark); color: rgba(255,255,255,0.9);
+  font-size: 0.75rem; letter-spacing: 0.02em;
+}
+.topbar .container { display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
+.topbar strong { color: var(--gold-light); font-weight: 600; }
+
 /* Navbar */
     .navbar {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      position: fixed; top: var(--topbar-h); left: 0; right: 0; z-index: 1000;
       padding: 1.25rem 0; transition: var(--transition);
     }
     .navbar.scrolled {

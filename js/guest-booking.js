@@ -17,6 +17,7 @@ import {
 } from './lib/availability.js';
 import { today, addDays, countNights, fmtDate, MAX_NIGHTS } from './lib/dates.js';
 import { ROOM_TYPES } from './lib/rooms.js';
+import { chosenLanguage, payWords } from './lib/lang.js';
 
 /** How long to wait on a read before telling the guest. Deliberately NOT
  *  applied to the booking write — see the submit handler. */
@@ -346,7 +347,7 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
       <div class="success-icon">✅</div>
       <h3>Room ${esc(room.number)} is held for you</h3>
       <p class="lb-small">Your booking reference</p>
-      <div class="lb-ref">${esc(ref)}</div>
+      <div class="lb-ref notranslate" translate="no">${esc(ref)}</div>
       <div class="lb-summary">
         <strong>${esc(b.guestName)}</strong><br>
         Room ${esc(room.number)} · ${esc(typeLabel(room))}<br>
@@ -354,7 +355,7 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
         <span class="lb-total">${money(b.total)} TSH</span> · pay on arrival
       </div>
       <p class="lb-next">
-        We will call or WhatsApp you on <strong>${esc(b.guestPhone)}</strong> to confirm.
+        We will call you on <strong>${esc(b.guestPhone)}</strong> to confirm.
         ${until ? `We are holding the room until <strong>${esc(until)}</strong>.` : ''}
       </p>
       ${payBlock(b)}
@@ -382,28 +383,56 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
     return number && !number.includes('REPLACE_ME') ? { ...t, number } : null;
   };
 
+  /** The desk's own line. It has no WhatsApp, so everything here says call. */
+  const desk = () => {
+    const n = String(CONFIG.receptionPhone ?? '').trim();
+    return n && !n.includes('REPLACE_ME') ? n : null;
+  };
+
+  const callAction = label => {
+    const n = desk();
+    if (!n) return '';
+    return `<a class="btn btn-outline lb-pay-call" href="tel:${esc(n.replace(/[^0-9+]/g, ''))}">${label} <span class="notranslate" translate="no">${esc(n)}</span></a>`;
+  };
+
+  /** Keeps its own meaning through Google Translate: a number rewritten by a
+   *  translator is money sent nowhere. */
+  const fixed = s => `<strong class="notranslate" translate="no">${s}</strong>`;
+
   function payBlock(b) {
     const t = till();
     if (!t) return '';                     // no till set up: the hold is the only way
+
+    const lang = chosenLanguage();
+    const w    = payWords(lang);
+    // When we have written the Swahili ourselves, Google must leave the card
+    // alone — translating Swahili into Swahili mangles it.
+    const leaveAlone = lang === 'sw' ? ' translate="no"' : '';
+
     return `
-      <div class="lb-pay" data-lb="pay">
-        <p class="lb-pay-lead">Arriving later than that?</p>
-        <p class="lb-small">Pay the full <strong>${money(b.total)} TSH</strong> to
-          <strong>${esc(t.name || 'our till')}</strong>, till <strong>${esc(t.number)}</strong>,
-          then tell us below. Reception checks the payment on their own phone and
-          keeps Room ${esc(b.roomNumber)} for you — no two-hour limit.</p>
+      <div class="lb-pay" data-lb="pay"${leaveAlone}>
+        <p class="lb-pay-lead">${esc(w.payLead)}</p>
+        <p class="lb-small">${w.payHow({
+          amount:   fixed(money(b.total)),
+          provider: t.provider ? fixed(esc(t.provider)) : '',
+          till:     fixed(esc(t.number)),
+          room:     esc(b.roomNumber),
+        })}</p>
+        ${t.name ? `<p class="lb-pay-name">${w.payName({ name: fixed(esc(t.name)) })}</p>` : ''}
         <div class="form-group">
-          <label for="lb-payref">Reference from your payment message</label>
-          <input type="text" id="lb-payref" placeholder="e.g. QWE4RT56YU" autocomplete="off" />
+          <label for="lb-payref">${esc(w.refLabel)}</label>
+          <input type="text" id="lb-payref" placeholder="${esc(w.refPlaceholder)}" autocomplete="off" />
           <div class="error-msg" id="lb-payref-error"></div>
         </div>
-        <button type="button" class="btn btn-primary" data-lb="paid">I have paid</button>
+        <button type="button" class="btn btn-primary" data-lb="paid">${esc(w.payButton)}</button>
       </div>`;
   }
 
   function wirePayment(b) {
     const box = el.done.querySelector('[data-lb="pay"]');
     if (!box) return;
+    const lang  = chosenLanguage();
+    const w     = payWords(lang);
     const input = box.querySelector('#lb-payref');
     const error = box.querySelector('#lb-payref-error');
     const btn   = box.querySelector('[data-lb="paid"]');
@@ -413,29 +442,35 @@ export async function mountLiveBooking({ CONFIG, preferredType = null }) {
       error.textContent = '';
       error.style.display = 'none';
       if (reference.length < 4) {
-        error.textContent = 'Please copy the reference from the payment message on your phone.';
+        error.textContent = w.refMissing;
         error.style.display = 'block';
         return;
       }
 
       btn.disabled = true;
       const label = btn.textContent;
-      btn.textContent = 'Telling reception…';
+      btn.textContent = w.payWorking;
       try {
         await claimPayment(db, b.id, {
           reference, payerName: b.guestName, payerPhone: b.guestPhone,
         }, b.createdBy);
         box.innerHTML =
-          `<p class="lb-pay-lead">Thank you — reception is checking your payment now.</p>
-           <p class="lb-small">They will call or WhatsApp you on <strong>${esc(b.guestPhone)}</strong>
-             once they see it. Room ${esc(b.roomNumber)} is being kept for you in the meantime.</p>`;
+          `<p class="lb-pay-lead">${esc(w.thanksLead)}</p>
+           <p class="lb-small">${w.thanksBody({
+             phone: fixed(esc(b.guestPhone)),
+             room:  esc(b.roomNumber),
+           })}</p>
+           ${callAction(esc(w.callButton))}`;
       } catch (err) {
         console.warn('[live booking] payment claim', err);
         btn.disabled = false;
         btn.textContent = label;
-        error.textContent = err instanceof PaymentClaimError || err instanceof RoomUnavailableError
-          ? err.message
-          : 'We could not pass that on just now. Please message reception on WhatsApp with your reference.';
+        // The engine speaks English. In Swahili its exact words are worth less
+        // than a sentence the guest can act on, so they get the plain one.
+        error.textContent =
+          err instanceof RoomUnavailableError ? w.roomGone
+          : (err instanceof PaymentClaimError && lang === 'en') ? err.message
+          : w.claimFailed({ desk: desk() || '' });
         error.style.display = 'block';
       }
     };
